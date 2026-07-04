@@ -4,7 +4,7 @@ import 'dart:io';
 import 'ytdlp_service.dart' show YtDlpException;
 
 /// Where a binary came from.
-enum BinarySource { custom, system, managed }
+enum BinarySource { custom, managed, bundled, system }
 
 class EngineStatus {
   const EngineStatus({
@@ -73,6 +73,22 @@ class EngineManager {
   String get _managedYtdlp => '${dataDirectory.path}${Platform.pathSeparator}yt-dlp$_exe';
   String get _managedFfmpeg => '${dataDirectory.path}${Platform.pathSeparator}ffmpeg$_exe';
 
+  /// Binaries shipped inside the app package by tool/bundle_engine.dart.
+  ///
+  /// macOS: Downpour.app/Contents/Resources/engine/ (exe lives in
+  /// Contents/MacOS/). Windows and Linux: engine/ next to the executable.
+  static String get bundledDir {
+    final exeDir = File(Platform.resolvedExecutable).parent;
+    if (Platform.isMacOS) {
+      return '${exeDir.parent.path}${Platform.pathSeparator}Resources'
+          '${Platform.pathSeparator}engine';
+    }
+    return '${exeDir.path}${Platform.pathSeparator}engine';
+  }
+
+  String get _bundledYtdlp => '$bundledDir${Platform.pathSeparator}yt-dlp$_exe';
+  String get _bundledFfmpeg => '$bundledDir${Platform.pathSeparator}ffmpeg$_exe';
+
   static List<String> get _systemCandidates {
     final home = Platform.environment['HOME'] ?? '';
     if (Platform.isWindows) {
@@ -104,12 +120,26 @@ class EngineManager {
     );
   }
 
-  /// Updates the managed yt-dlp in place; no-op for system/custom binaries.
+  /// Updates yt-dlp. Managed copies self-update via -U; a bundled copy lives
+  /// inside the (read-only, signed) app package, so the latest release is
+  /// downloaded into the managed dir, which shadows it from then on.
   Future<void> updateYtdlp(EngineStatus current) async {
-    if (current.ytdlpSource != BinarySource.managed) return;
-    final result = await Process.run(current.ytdlpPath, ['-U']);
-    if (result.exitCode != 0) {
-      throw YtDlpException('Update failed: ${(result.stderr as String).trim()}');
+    switch (current.ytdlpSource) {
+      case BinarySource.managed:
+        final result = await Process.run(current.ytdlpPath, ['-U']);
+        if (result.exitCode != 0) {
+          throw YtDlpException('Update failed: ${(result.stderr as String).trim()}');
+        }
+      case BinarySource.bundled:
+        await dataDirectory.create(recursive: true);
+        final temp = File('$_managedYtdlp.part');
+        await _download(_ytdlpDownloads[_os]!, temp, (_) {});
+        await temp.rename(_managedYtdlp);
+        await _markExecutable(_managedYtdlp);
+        await _runVersion(_managedYtdlp);
+      case BinarySource.system || BinarySource.custom:
+        // The user owns these installs; leave them alone.
+        return;
     }
   }
 
@@ -125,7 +155,10 @@ class EngineManager {
       return (path, BinarySource.custom);
     }
 
+    // Managed before bundled: in-app updates land in the managed dir and must
+    // shadow the (fixed) copy shipped inside the app package.
     if (await File(_managedYtdlp).exists()) return (_managedYtdlp, BinarySource.managed);
+    if (await File(_bundledYtdlp).exists()) return (_bundledYtdlp, BinarySource.bundled);
 
     if (useSystemBinaries) {
       final system = await _findOnSystem('yt-dlp$_exe');
@@ -149,6 +182,7 @@ class EngineManager {
 
   Future<String?> _ensureFfmpeg(void Function(EngineSetupProgress)? onProgress) async {
     if (await File(_managedFfmpeg).exists()) return _managedFfmpeg;
+    if (await File(_bundledFfmpeg).exists()) return _bundledFfmpeg;
 
     if (useSystemBinaries) {
       final system = await _findOnSystem('ffmpeg$_exe');

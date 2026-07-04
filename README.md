@@ -9,13 +9,29 @@ desktop app for everyone else: no terminal, no Python, no manual installs.
 
 ## Zero setup
 
-On first launch Downpour provisions its own engine automatically:
+Downpour provisions its own engine automatically, resolving yt-dlp and ffmpeg
+in this order:
 
-1. Uses your custom yt-dlp path if you set one in Settings.
-2. Otherwise uses an existing system install of yt-dlp/ffmpeg if found.
-3. Otherwise downloads the official standalone yt-dlp build (no Python
-   required) and a static ffmpeg into the app's data folder, with progress
-   shown in the app.
+1. A custom yt-dlp path set in Settings.
+2. Binaries updated in-app (managed copies in the app's data folder).
+3. Binaries bundled inside the app package (see packaging below).
+4. An existing system install.
+5. Downloaded on first launch: the official standalone yt-dlp build (no
+   Python required) and a static ffmpeg, with progress shown in the app.
+
+Release packages ship with both binaries bundled, so a fresh install works
+offline with no first-launch download:
+
+```sh
+flutter build macos --release
+dart tool/bundle_engine.dart macos
+# then re-sign: codesign --force --deep -s - build/macos/Build/Products/Release/Downpour.app
+```
+
+Same for `windows` and `linux`. The script drops yt-dlp + ffmpeg into
+`Contents/Resources/engine/` (macOS) or `engine/` next to the executable.
+The bundled ffmpeg builds are GPL — include their license notice when
+distributing.
 
 If ffmpeg can't be provisioned, downloads still work: quality presets fall
 back to single-file formats and audio saves as M4A instead of MP3. A
@@ -43,6 +59,29 @@ Engine smoke test (simulates a machine with nothing installed):
 
 ```sh
 dart tool/smoke.dart
+```
+
+## End-to-end tests (Patrol)
+
+E2E tests live in `integration_test/` and use
+[Patrol](https://patrol.leancode.co) finders. The download test drives the
+real app: puts a link on the clipboard, clicks "Paste & download", waits for
+the tile to reach done, and checks the file landed on disk.
+
+Run headless (no permissions needed):
+
+```sh
+flutter test integration_test -d macos
+```
+
+The full Patrol native runner is also wired up (RunnerUITests target). It
+needs a one-time grant: System Settings → Privacy & Security → Automation /
+Accessibility for your terminal, because macOS gates UI automation. Then:
+
+```sh
+dart pub global activate patrol_cli
+patrol test -d macos          # run under the native automator
+patrol develop -d macos       # live test loop with hot restart while developing
 ```
 
 ## Architecture

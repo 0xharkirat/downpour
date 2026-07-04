@@ -121,7 +121,8 @@ class SettingsScreen extends ConsumerWidget {
                                     : 'ffmpeg unavailable — downloads fall back to '
                                         'single-file formats and audio saves as M4A',
                               ),
-                              if (value.ytdlpSource == BinarySource.managed) ...[
+                              if (value.ytdlpSource == BinarySource.managed ||
+                                  value.ytdlpSource == BinarySource.bundled) ...[
                                 const SizedBox(height: 10),
                                 FButton(
                                   variant: FButtonVariant.outline,
@@ -214,6 +215,7 @@ class SettingsScreen extends ConsumerWidget {
 
   String _sourceLabel(BinarySource source) => switch (source) {
         BinarySource.managed => 'managed by Downpour',
+        BinarySource.bundled => 'bundled with Downpour',
         BinarySource.system => 'system install',
         BinarySource.custom => 'custom path',
       };
