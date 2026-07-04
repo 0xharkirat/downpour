@@ -79,6 +79,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 16),
+                if (!ref.watch(engineSupportedProvider)) ...[
+                  FCard.raw(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(FLucideIcons.circleX, size: 16, color: theme.colors.destructive),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Downloads need the yt-dlp CLI, which this platform cannot run yet. '
+                              'A mobile engine is planned.',
+                              style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 FTextField(
                   control: FTextFieldControl.managed(controller: _urlController),
                   hint: 'Paste a video link — YouTube, Vimeo, X, and 1800+ sites',
