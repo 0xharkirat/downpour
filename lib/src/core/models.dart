@@ -3,21 +3,28 @@ library;
 
 /// Quality presets mapped to yt-dlp format selectors.
 enum QualityPreset {
-  best('Best', 'bv*+ba/b'),
-  uhd2160('4K', 'bv*[height<=2160]+ba/b[height<=2160]'),
-  hd1080('1080p', 'bv*[height<=1080]+ba/b[height<=1080]'),
-  hd720('720p', 'bv*[height<=720]+ba/b[height<=720]'),
-  audio('Audio', '');
+  best('Best', null),
+  uhd2160('4K', 2160),
+  hd1080('1080p', 1080),
+  hd720('720p', 720),
+  audio('Audio', null);
 
-  const QualityPreset(this.label, this.formatSelector);
+  const QualityPreset(this.label, this.maxHeight);
 
   final String label;
-  final String formatSelector;
+  final int? maxHeight;
 
-  /// Extra yt-dlp arguments for this preset.
-  List<String> get args => this == QualityPreset.audio
-      ? const ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
-      : ['-f', formatSelector];
+  /// yt-dlp arguments for this preset. Without ffmpeg, streams can't be
+  /// merged or converted, so selectors degrade to single-file formats.
+  List<String> args({required bool ffmpegAvailable}) {
+    if (this == QualityPreset.audio) {
+      return ffmpegAvailable
+          ? const ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
+          : const ['-f', 'ba[ext=m4a]/ba/b'];
+    }
+    final h = maxHeight == null ? '' : '[height<=$maxHeight]';
+    return ffmpegAvailable ? ['-f', 'bv*$h+ba/b$h'] : ['-f', 'b$h/b'];
+  }
 }
 
 /// Metadata about a video, parsed from `yt-dlp -J`.

@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
@@ -8,12 +5,8 @@ import 'package:forui/forui.dart';
 import 'core/settings.dart';
 import 'router.dart';
 
-bool get _isTouchPlatform => !kIsWeb && (Platform.isIOS || Platform.isAndroid);
-
-FThemeData themeFor({required bool dark}) {
-  final palette = dark ? FThemes.zinc.dark : FThemes.zinc.light;
-  return _isTouchPlatform ? palette.touch : palette.desktop;
-}
+FThemeData themeFor({required bool dark}) =>
+    dark ? FThemes.zinc.dark.desktop : FThemes.zinc.light.desktop;
 
 class DownpourApp extends ConsumerWidget {
   const DownpourApp({super.key});

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -24,6 +22,9 @@ class AppSettings {
   });
 
   final String? downloadDir;
+
+  /// Custom yt-dlp path for power users; the engine manager handles everyone
+  /// else automatically.
   final String? ytdlpPath;
   final QualityPreset defaultPreset;
   final ThemeMode themeMode;
@@ -67,13 +68,18 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   Future<void> setYtdlpPath(String path) async {
-    state = state.copyWith(ytdlpPath: path);
+    // copyWith can't null a field; rebuild explicitly for the empty case.
+    state = AppSettings(
+      downloadDir: state.downloadDir,
+      ytdlpPath: path.trim().isEmpty ? null : path.trim(),
+      defaultPreset: state.defaultPreset,
+      themeMode: state.themeMode,
+    );
     if (path.trim().isEmpty) {
       await _prefs.remove(_kYtdlpPath);
     } else {
       await _prefs.setString(_kYtdlpPath, path.trim());
     }
-    ref.invalidate(ytDlpVersionProvider);
   }
 
   Future<void> setDefaultPreset(QualityPreset preset) async {
@@ -100,17 +106,3 @@ final downloadDirProvider = FutureProvider<String>((ref) async {
   final documents = await getApplicationDocumentsDirectory();
   return documents.path;
 });
-
-/// Resolved yt-dlp version, used as a health check on the settings screen.
-final ytDlpVersionProvider = FutureProvider<String>((ref) async {
-  final service = ref.watch(ytDlpServiceProvider);
-  final override = ref.watch(settingsProvider.select((s) => s.ytdlpPath));
-  final bin = await service.resolveBinary(override: override);
-  final version = await service.version(override: override);
-  return '$version · $bin';
-});
-
-/// Whether this platform can spawn the yt-dlp CLI.
-final engineSupportedProvider = Provider<bool>(
-  (_) => Platform.isMacOS || Platform.isWindows || Platform.isLinux,
-);

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "dev.harkirat" "\0"
-            VALUE "FileDescription", "downpour" "\0"
+            VALUE "FileDescription", "Downpour" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "downpour" "\0"
+            VALUE "InternalName", "Downpour" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 dev.harkirat. All rights reserved." "\0"
             VALUE "OriginalFilename", "downpour.exe" "\0"
-            VALUE "ProductName", "downpour" "\0"
+            VALUE "ProductName", "Downpour" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

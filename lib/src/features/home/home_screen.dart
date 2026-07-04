@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/engine_provider.dart';
 import '../../core/models.dart';
 import '../../core/settings.dart';
 import '../downloads/download_tile.dart';
@@ -79,27 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 16),
-                if (!ref.watch(engineSupportedProvider)) ...[
-                  FCard.raw(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Icon(FLucideIcons.circleX, size: 16, color: theme.colors.destructive),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Downloads need the yt-dlp CLI, which this platform cannot run yet. '
-                              'A mobile engine is planned.',
-                              style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                const _EngineBanner(),
                 FTextField(
                   control: FTextFieldControl.managed(controller: _urlController),
                   hint: 'Paste a video link — YouTube, Vimeo, X, and 1800+ sites',
@@ -174,6 +155,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// First-launch engine setup progress and failure states. Invisible once the
+/// engine is ready.
+class _EngineBanner extends ConsumerWidget {
+  const _EngineBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = context.theme;
+    final engine = ref.watch(engineProvider);
+    final setup = ref.watch(engineSetupProgressProvider);
+
+    final Widget? content = switch (engine) {
+      AsyncError(:final error) => Row(
+          children: [
+            Icon(FLucideIcons.circleX, size: 16, color: theme.colors.destructive),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Could not set up the download engine: $error',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FButton(
+              variant: FButtonVariant.outline,
+              size: FButtonSizeVariant.sm,
+              mainAxisSize: MainAxisSize.min,
+              onPress: () => ref.read(engineProvider.notifier).retry(),
+              prefix: const Icon(FLucideIcons.refreshCw),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      AsyncLoading() when setup != null => Row(
+          children: [
+            Icon(FLucideIcons.hardDriveDownload, size: 16, color: theme.colors.primary),
+            const SizedBox(width: 8),
+            Text(
+              'One-time setup: ${setup.label}',
+              style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: setup.fraction == null
+                  ? const FProgress()
+                  : FDeterminateProgress(value: setup.fraction!),
+            ),
+          ],
+        ),
+      _ => null,
+    };
+
+    if (content == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: FCard.raw(
+        child: Padding(padding: const EdgeInsets.all(12), child: content),
       ),
     );
   }

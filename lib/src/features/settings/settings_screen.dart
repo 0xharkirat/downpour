@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/engine_manager.dart';
+import '../../core/engine_provider.dart';
 import '../../core/models.dart';
 import '../../core/settings.dart';
 
@@ -17,7 +19,7 @@ class SettingsScreen extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final notifier = ref.read(settingsProvider.notifier);
     final downloadDir = ref.watch(downloadDirProvider);
-    final ytdlp = ref.watch(ytDlpVersionProvider);
+    final engine = ref.watch(engineProvider);
 
     return FScaffold(
       header: FHeader.nested(
@@ -96,33 +98,76 @@ class SettingsScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('yt-dlp path (optional)', style: _labelStyle(theme)),
+                      switch (engine) {
+                        AsyncData(:final value) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _EngineStatus(
+                                icon: FLucideIcons.circleCheck,
+                                color: theme.colors.primary,
+                                text: 'yt-dlp ${value.ytdlpVersion} '
+                                    '(${_sourceLabel(value.ytdlpSource)}) · ${value.ytdlpPath}',
+                              ),
+                              const SizedBox(height: 6),
+                              _EngineStatus(
+                                icon: value.ffmpegAvailable
+                                    ? FLucideIcons.circleCheck
+                                    : FLucideIcons.circleX,
+                                color: value.ffmpegAvailable
+                                    ? theme.colors.primary
+                                    : theme.colors.destructive,
+                                text: value.ffmpegAvailable
+                                    ? 'ffmpeg · ${value.ffmpegPath}'
+                                    : 'ffmpeg unavailable — downloads fall back to '
+                                        'single-file formats and audio saves as M4A',
+                              ),
+                              if (value.ytdlpSource == BinarySource.managed) ...[
+                                const SizedBox(height: 10),
+                                FButton(
+                                  variant: FButtonVariant.outline,
+                                  size: FButtonSizeVariant.sm,
+                                  mainAxisSize: MainAxisSize.min,
+                                  prefix: const Icon(FLucideIcons.refreshCw),
+                                  onPress: () => ref.read(engineProvider.notifier).updateYtdlp(),
+                                  child: const Text('Update yt-dlp'),
+                                ),
+                              ],
+                            ],
+                          ),
+                        AsyncError(:final error) => Row(
+                            children: [
+                              Expanded(
+                                child: _EngineStatus(
+                                  icon: FLucideIcons.circleX,
+                                  color: theme.colors.destructive,
+                                  text: '$error',
+                                ),
+                              ),
+                              FButton(
+                                variant: FButtonVariant.outline,
+                                size: FButtonSizeVariant.sm,
+                                mainAxisSize: MainAxisSize.min,
+                                onPress: () => ref.read(engineProvider.notifier).retry(),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        _ => _EngineStatus(
+                            icon: FLucideIcons.loaderCircle,
+                            color: theme.colors.mutedForeground,
+                            text: 'Setting up engine…',
+                          ),
+                      },
+                      const SizedBox(height: 16),
+                      Text('Custom yt-dlp path (advanced, optional)', style: _labelStyle(theme)),
                       const SizedBox(height: 6),
                       FTextField(
                         control: FTextFieldControl.managed(
                           initial: TextEditingValue(text: settings.ytdlpPath ?? ''),
                         ),
-                        hint: 'Auto-detected when empty',
+                        hint: 'Managed automatically when empty',
                         onSubmit: notifier.setYtdlpPath,
                       ),
-                      const SizedBox(height: 10),
-                      switch (ytdlp) {
-                        AsyncData(:final value) => _EngineStatus(
-                            icon: FLucideIcons.circleCheck,
-                            color: theme.colors.primary,
-                            text: value,
-                          ),
-                        AsyncError(:final error) => _EngineStatus(
-                            icon: FLucideIcons.circleX,
-                            color: theme.colors.destructive,
-                            text: '$error',
-                          ),
-                        _ => _EngineStatus(
-                            icon: FLucideIcons.loaderCircle,
-                            color: theme.colors.mutedForeground,
-                            text: 'Checking yt-dlp…',
-                          ),
-                      },
                     ],
                   ),
                 ),
@@ -166,6 +211,12 @@ class SettingsScreen extends ConsumerWidget {
         fontWeight: FontWeight.w600,
         color: theme.colors.foreground,
       );
+
+  String _sourceLabel(BinarySource source) => switch (source) {
+        BinarySource.managed => 'managed by Downpour',
+        BinarySource.system => 'system install',
+        BinarySource.custom => 'custom path',
+      };
 }
 
 class _SectionLabel extends StatelessWidget {

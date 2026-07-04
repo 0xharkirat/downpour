@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/engine_provider.dart';
 import '../../core/models.dart';
 import '../../core/settings.dart';
 import '../../core/ytdlp_service.dart';
@@ -27,10 +28,12 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
     state = [task, ...state];
 
     final service = ref.read(ytDlpServiceProvider);
-    final override = ref.read(settingsProvider).ytdlpPath;
 
     try {
-      final info = await service.fetchInfo(task.url, override: override);
+      // Waits for first-launch engine setup; tasks queue up meanwhile.
+      final engine = await ref.read(engineProvider.future);
+
+      final info = await service.fetchInfo(task.url, binary: engine.ytdlpPath);
       _update(id, (t) => t.copyWith(info: info, status: DownloadStatus.downloading));
 
       final directory = await ref.read(downloadDirProvider.future);
@@ -40,7 +43,8 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
         url: task.url,
         preset: preset,
         directory: directory,
-        override: override,
+        binary: engine.ytdlpPath,
+        ffmpegPath: engine.ffmpegPath,
       );
       _handles[id] = handle;
 
