@@ -80,6 +80,8 @@ class YtDlpService {
   }) async {
     final args = [
       '--newline',
+      // --print implies --quiet, which silences progress; force it back on.
+      '--progress',
       '--no-playlist',
       '--no-warnings',
       '--progress-template',
