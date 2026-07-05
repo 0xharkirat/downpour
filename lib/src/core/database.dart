@@ -24,6 +24,9 @@ class DownloadRecords extends Table {
   /// Cached transcript (SRT) and the sidecar file written next to the video.
   TextColumn get transcriptSrt => text().nullable()();
   TextColumn get transcriptPath => text().nullable()();
+
+  /// What was actually downloaded, e.g. "1080p" or "audio".
+  TextColumn get resolution => text().nullable()();
 }
 
 @DriftDatabase(tables: [DownloadRecords])
@@ -33,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -41,6 +44,9 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             await m.addColumn(downloadRecords, downloadRecords.transcriptSrt);
             await m.addColumn(downloadRecords, downloadRecords.transcriptPath);
+          }
+          if (from < 3) {
+            await m.addColumn(downloadRecords, downloadRecords.resolution);
           }
         },
       );
@@ -98,5 +104,6 @@ extension DownloadRecordX on DownloadRecord {
         ),
         filePath: filePath,
         error: error,
+        resolution: resolution,
       );
 }

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_notifier/local_notifier.dart';
 
 import '../../core/database.dart';
 import '../../core/engine_provider.dart';
@@ -83,10 +84,19 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
             );
           case ProcessingEvent():
             _update(id, (t) => t.copyWith(status: DownloadStatus.processing, progress: 1));
-          case DoneEvent(:final filePath):
+          case DoneEvent(:final filePath, :final resolution):
             _handles.remove(id);
-            _update(id, (t) => t.copyWith(status: DownloadStatus.done, progress: 1, filePath: filePath));
+            _update(
+              id,
+              (t) => t.copyWith(
+                status: DownloadStatus.done,
+                progress: 1,
+                filePath: filePath,
+                resolution: resolution,
+              ),
+            );
             _persist(id);
+            _notify(id, succeeded: true);
           case FailedEvent(:final message):
             _handles.remove(id);
             _update(id, (t) {
@@ -94,6 +104,7 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
               return t.copyWith(status: DownloadStatus.error, error: message);
             });
             _persist(id);
+            _notify(id, succeeded: false);
         }
       });
     } on YtDlpException catch (e) {
@@ -103,6 +114,25 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
       _update(id, (t) => t.copyWith(status: DownloadStatus.error, error: '$e'));
       _persist(id);
     }
+  }
+
+  /// System notification on completion; clicking a success opens the file.
+  void _notify(String id, {required bool succeeded}) {
+    // Suppress during automated test runs.
+    if (Platform.environment.containsKey('FLUTTER_TEST')) return;
+    final task = state.where((t) => t.id == id).firstOrNull;
+    if (task == null || task.status == DownloadStatus.canceled) return;
+
+    final notification = LocalNotification(
+      title: succeeded ? 'Download complete' : 'Download failed',
+      body: succeeded
+          ? '${task.displayTitle}${task.resolution == null ? '' : ' (${task.resolution})'}'
+          : '${task.displayTitle}: ${task.error ?? 'unknown error'}',
+    );
+    if (succeeded && task.filePath != null) {
+      notification.onClick = () => openFile(task);
+    }
+    notification.show();
   }
 
   Future<void> _persist(String id) async {
@@ -119,6 +149,7 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
             status: task.status.name,
             filePath: Value(task.filePath),
             error: Value(task.error),
+            resolution: Value(task.resolution),
           ),
         );
     _update(id, (t) => t.copyWith(recordId: recordId));

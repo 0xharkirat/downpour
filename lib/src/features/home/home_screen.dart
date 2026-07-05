@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,11 +24,32 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _urlController = TextEditingController();
+  var _dragging = false;
 
   @override
   void dispose() {
     _urlController.dispose();
     super.dispose();
+  }
+
+  /// Browsers deliver dragged links as .webloc (macOS) or .url (Windows)
+  /// files; extract the address and fetch its preview.
+  Future<void> _handleDrop(DropDoneDetails details) async {
+    for (final item in details.files) {
+      final path = item.path;
+      String? url;
+      if (path.endsWith('.webloc') || path.endsWith('.url')) {
+        final content = await File(path).readAsString();
+        url = RegExp(r'https?://[^\s<>"]+').firstMatch(content)?.group(0);
+      } else if (RegExp(r'^https?://').hasMatch(path)) {
+        url = path;
+      }
+      if (url != null) {
+        _urlController.text = url;
+        _fetch(url);
+        return;
+      }
+    }
   }
 
   Future<void> _paste() async {
@@ -51,7 +75,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = context.theme;
     final tasks = ref.watch(downloadsProvider);
-    final hasFinished = tasks.any((t) => !t.status.isActive);
+    final active = tasks.where((t) => t.status.isActive).toList();
+    final history = tasks.where((t) => !t.status.isActive).toList();
 
     return FScaffold(
       childPad: false,
@@ -71,85 +96,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 16),
-                const _EngineBanner(),
-                Row(
+      child: DropTarget(
+        onDragEntered: (_) => setState(() => _dragging = true),
+        onDragExited: (_) => setState(() => _dragging = false),
+        onDragDone: (details) {
+          setState(() => _dragging = false);
+          _handleDrop(details);
+        },
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(
+              width: 2,
+              color: _dragging ? theme.colors.primary : const Color(0x00000000),
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: FTextField(
-                        control: FTextFieldControl.managed(controller: _urlController),
-                        hint: 'Paste a video link from YouTube, Vimeo, X, and 1800+ other sites',
-                        keyboardType: TextInputType.url,
-                        textInputAction: TextInputAction.go,
-                        onSubmit: _fetch,
-                        autofocus: true,
-                      ),
+                    const SizedBox(height: 16),
+                    const _EngineBanner(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FTextField(
+                            control: FTextFieldControl.managed(controller: _urlController),
+                            hint: 'Paste or drop a video link from YouTube, Vimeo, X, and 1800+ other sites',
+                            keyboardType: TextInputType.url,
+                            textInputAction: TextInputAction.go,
+                            onSubmit: _fetch,
+                            autofocus: true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FButton(
+                          mainAxisSize: MainAxisSize.min,
+                          onPress: _paste,
+                          prefix: const Icon(FLucideIcons.clipboardPaste),
+                          child: const Text('Paste'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    FButton(
-                      mainAxisSize: MainAxisSize.min,
-                      onPress: _paste,
-                      prefix: const Icon(FLucideIcons.clipboardPaste),
-                      child: const Text('Paste'),
+                    const SizedBox(height: 12),
+                    const _PreviewCard(),
+                    Expanded(
+                      child: tasks.isEmpty
+                          ? const _EmptyState()
+                          : ListView(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              children: [
+                                if (active.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  _sectionHeader(theme, 'In progress'),
+                                  const SizedBox(height: 8),
+                                  for (final task in active) ...[
+                                    DownloadTile(key: ValueKey(task.id), task: task),
+                                    const SizedBox(height: 10),
+                                  ],
+                                ],
+                                if (history.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      _sectionHeader(theme, 'History'),
+                                      const Spacer(),
+                                      FButton(
+                                        variant: FButtonVariant.ghost,
+                                        size: FButtonSizeVariant.sm,
+                                        mainAxisSize: MainAxisSize.min,
+                                        onPress: () =>
+                                            ref.read(downloadsProvider.notifier).clearFinished(),
+                                        child: const Text('Clear history'),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  for (final task in history) ...[
+                                    DownloadTile(key: ValueKey(task.id), task: task),
+                                    const SizedBox(height: 10),
+                                  ],
+                                ],
+                              ],
+                            ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const _PreviewCard(),
-                Expanded(
-                  child: tasks.isEmpty
-                      ? const _EmptyState()
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Text('Downloads', style: theme.typography.body.lg.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colors.foreground,
-                                )),
-                                const Spacer(),
-                                if (hasFinished)
-                                  FButton(
-                                    variant: FButtonVariant.ghost,
-                                    size: FButtonSizeVariant.sm,
-                                    mainAxisSize: MainAxisSize.min,
-                                    onPress: () => ref.read(downloadsProvider.notifier).clearFinished(),
-                                    child: const Text('Clear finished'),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Expanded(
-                              child: ListView.separated(
-                                padding: const EdgeInsets.only(bottom: 24),
-                                itemCount: tasks.length,
-                                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                                itemBuilder: (context, index) => DownloadTile(
-                                  key: ValueKey(tasks[index].id),
-                                  task: tasks[index],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  Widget _sectionHeader(FThemeData theme, String text) => Text(
+        text,
+        style: theme.typography.body.lg.copyWith(
+          fontWeight: FontWeight.w600,
+          color: theme.colors.foreground,
+        ),
+      );
 }
 
 /// Fetched metadata for the pasted link: thumbnail, title, duration, and the

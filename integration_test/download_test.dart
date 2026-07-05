@@ -42,8 +42,8 @@ void main() {
     // History from earlier runs would satisfy the done-state finders below;
     // start from a clean list.
     await $.pump(const Duration(seconds: 1));
-    if (find.text('Clear finished').evaluate().isNotEmpty) {
-      await $('Clear finished').tap(settlePolicy: SettlePolicy.noSettle);
+    if (find.text('Clear history').evaluate().isNotEmpty) {
+      await $('Clear history').tap(settlePolicy: SettlePolicy.noSettle);
       await $.pump(const Duration(seconds: 1));
     }
 

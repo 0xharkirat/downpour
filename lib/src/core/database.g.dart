@@ -145,6 +145,17 @@ class $DownloadRecordsTable extends DownloadRecords
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _resolutionMeta = const VerificationMeta(
+    'resolution',
+  );
+  @override
+  late final GeneratedColumn<String> resolution = GeneratedColumn<String>(
+    'resolution',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -160,6 +171,7 @@ class $DownloadRecordsTable extends DownloadRecords
     createdAt,
     transcriptSrt,
     transcriptPath,
+    resolution,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -265,6 +277,12 @@ class $DownloadRecordsTable extends DownloadRecords
         ),
       );
     }
+    if (data.containsKey('resolution')) {
+      context.handle(
+        _resolutionMeta,
+        resolution.isAcceptableOrUnknown(data['resolution']!, _resolutionMeta),
+      );
+    }
     return context;
   }
 
@@ -326,6 +344,10 @@ class $DownloadRecordsTable extends DownloadRecords
         DriftSqlType.string,
         data['${effectivePrefix}transcript_path'],
       ),
+      resolution: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}resolution'],
+      ),
     );
   }
 
@@ -351,6 +373,9 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
   /// Cached transcript (SRT) and the sidecar file written next to the video.
   final String? transcriptSrt;
   final String? transcriptPath;
+
+  /// What was actually downloaded, e.g. "1080p" or "audio".
+  final String? resolution;
   const DownloadRecord({
     required this.id,
     required this.url,
@@ -365,6 +390,7 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
     required this.createdAt,
     this.transcriptSrt,
     this.transcriptPath,
+    this.resolution,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -395,6 +421,9 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
     }
     if (!nullToAbsent || transcriptPath != null) {
       map['transcript_path'] = Variable<String>(transcriptPath);
+    }
+    if (!nullToAbsent || resolution != null) {
+      map['resolution'] = Variable<String>(resolution);
     }
     return map;
   }
@@ -428,6 +457,9 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
       transcriptPath: transcriptPath == null && nullToAbsent
           ? const Value.absent()
           : Value(transcriptPath),
+      resolution: resolution == null && nullToAbsent
+          ? const Value.absent()
+          : Value(resolution),
     );
   }
 
@@ -450,6 +482,7 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       transcriptSrt: serializer.fromJson<String?>(json['transcriptSrt']),
       transcriptPath: serializer.fromJson<String?>(json['transcriptPath']),
+      resolution: serializer.fromJson<String?>(json['resolution']),
     );
   }
   @override
@@ -469,6 +502,7 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'transcriptSrt': serializer.toJson<String?>(transcriptSrt),
       'transcriptPath': serializer.toJson<String?>(transcriptPath),
+      'resolution': serializer.toJson<String?>(resolution),
     };
   }
 
@@ -486,6 +520,7 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
     DateTime? createdAt,
     Value<String?> transcriptSrt = const Value.absent(),
     Value<String?> transcriptPath = const Value.absent(),
+    Value<String?> resolution = const Value.absent(),
   }) => DownloadRecord(
     id: id ?? this.id,
     url: url ?? this.url,
@@ -506,6 +541,7 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
     transcriptPath: transcriptPath.present
         ? transcriptPath.value
         : this.transcriptPath,
+    resolution: resolution.present ? resolution.value : this.resolution,
   );
   DownloadRecord copyWithCompanion(DownloadRecordsCompanion data) {
     return DownloadRecord(
@@ -528,6 +564,9 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
       transcriptPath: data.transcriptPath.present
           ? data.transcriptPath.value
           : this.transcriptPath,
+      resolution: data.resolution.present
+          ? data.resolution.value
+          : this.resolution,
     );
   }
 
@@ -546,7 +585,8 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
           ..write('error: $error, ')
           ..write('createdAt: $createdAt, ')
           ..write('transcriptSrt: $transcriptSrt, ')
-          ..write('transcriptPath: $transcriptPath')
+          ..write('transcriptPath: $transcriptPath, ')
+          ..write('resolution: $resolution')
           ..write(')'))
         .toString();
   }
@@ -566,6 +606,7 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
     createdAt,
     transcriptSrt,
     transcriptPath,
+    resolution,
   );
   @override
   bool operator ==(Object other) =>
@@ -583,7 +624,8 @@ class DownloadRecord extends DataClass implements Insertable<DownloadRecord> {
           other.error == this.error &&
           other.createdAt == this.createdAt &&
           other.transcriptSrt == this.transcriptSrt &&
-          other.transcriptPath == this.transcriptPath);
+          other.transcriptPath == this.transcriptPath &&
+          other.resolution == this.resolution);
 }
 
 class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
@@ -600,6 +642,7 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
   final Value<DateTime> createdAt;
   final Value<String?> transcriptSrt;
   final Value<String?> transcriptPath;
+  final Value<String?> resolution;
   const DownloadRecordsCompanion({
     this.id = const Value.absent(),
     this.url = const Value.absent(),
@@ -614,6 +657,7 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
     this.createdAt = const Value.absent(),
     this.transcriptSrt = const Value.absent(),
     this.transcriptPath = const Value.absent(),
+    this.resolution = const Value.absent(),
   });
   DownloadRecordsCompanion.insert({
     this.id = const Value.absent(),
@@ -629,6 +673,7 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
     this.createdAt = const Value.absent(),
     this.transcriptSrt = const Value.absent(),
     this.transcriptPath = const Value.absent(),
+    this.resolution = const Value.absent(),
   }) : url = Value(url),
        title = Value(title),
        preset = Value(preset),
@@ -647,6 +692,7 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
     Expression<DateTime>? createdAt,
     Expression<String>? transcriptSrt,
     Expression<String>? transcriptPath,
+    Expression<String>? resolution,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -662,6 +708,7 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
       if (createdAt != null) 'created_at': createdAt,
       if (transcriptSrt != null) 'transcript_srt': transcriptSrt,
       if (transcriptPath != null) 'transcript_path': transcriptPath,
+      if (resolution != null) 'resolution': resolution,
     });
   }
 
@@ -679,6 +726,7 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
     Value<DateTime>? createdAt,
     Value<String?>? transcriptSrt,
     Value<String?>? transcriptPath,
+    Value<String?>? resolution,
   }) {
     return DownloadRecordsCompanion(
       id: id ?? this.id,
@@ -694,6 +742,7 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
       createdAt: createdAt ?? this.createdAt,
       transcriptSrt: transcriptSrt ?? this.transcriptSrt,
       transcriptPath: transcriptPath ?? this.transcriptPath,
+      resolution: resolution ?? this.resolution,
     );
   }
 
@@ -739,6 +788,9 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
     if (transcriptPath.present) {
       map['transcript_path'] = Variable<String>(transcriptPath.value);
     }
+    if (resolution.present) {
+      map['resolution'] = Variable<String>(resolution.value);
+    }
     return map;
   }
 
@@ -757,7 +809,8 @@ class DownloadRecordsCompanion extends UpdateCompanion<DownloadRecord> {
           ..write('error: $error, ')
           ..write('createdAt: $createdAt, ')
           ..write('transcriptSrt: $transcriptSrt, ')
-          ..write('transcriptPath: $transcriptPath')
+          ..write('transcriptPath: $transcriptPath, ')
+          ..write('resolution: $resolution')
           ..write(')'))
         .toString();
   }
@@ -791,6 +844,7 @@ typedef $$DownloadRecordsTableCreateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<String?> transcriptSrt,
       Value<String?> transcriptPath,
+      Value<String?> resolution,
     });
 typedef $$DownloadRecordsTableUpdateCompanionBuilder =
     DownloadRecordsCompanion Function({
@@ -807,6 +861,7 @@ typedef $$DownloadRecordsTableUpdateCompanionBuilder =
       Value<DateTime> createdAt,
       Value<String?> transcriptSrt,
       Value<String?> transcriptPath,
+      Value<String?> resolution,
     });
 
 class $$DownloadRecordsTableFilterComposer
@@ -880,6 +935,11 @@ class $$DownloadRecordsTableFilterComposer
 
   ColumnFilters<String> get transcriptPath => $composableBuilder(
     column: $table.transcriptPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get resolution => $composableBuilder(
+    column: $table.resolution,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -957,6 +1017,11 @@ class $$DownloadRecordsTableOrderingComposer
     column: $table.transcriptPath,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get resolution => $composableBuilder(
+    column: $table.resolution,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DownloadRecordsTableAnnotationComposer
@@ -1012,6 +1077,11 @@ class $$DownloadRecordsTableAnnotationComposer
     column: $table.transcriptPath,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get resolution => $composableBuilder(
+    column: $table.resolution,
+    builder: (column) => column,
+  );
 }
 
 class $$DownloadRecordsTableTableManager
@@ -1064,6 +1134,7 @@ class $$DownloadRecordsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> transcriptSrt = const Value.absent(),
                 Value<String?> transcriptPath = const Value.absent(),
+                Value<String?> resolution = const Value.absent(),
               }) => DownloadRecordsCompanion(
                 id: id,
                 url: url,
@@ -1078,6 +1149,7 @@ class $$DownloadRecordsTableTableManager
                 createdAt: createdAt,
                 transcriptSrt: transcriptSrt,
                 transcriptPath: transcriptPath,
+                resolution: resolution,
               ),
           createCompanionCallback:
               ({
@@ -1094,6 +1166,7 @@ class $$DownloadRecordsTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> transcriptSrt = const Value.absent(),
                 Value<String?> transcriptPath = const Value.absent(),
+                Value<String?> resolution = const Value.absent(),
               }) => DownloadRecordsCompanion.insert(
                 id: id,
                 url: url,
@@ -1108,6 +1181,7 @@ class $$DownloadRecordsTableTableManager
                 createdAt: createdAt,
                 transcriptSrt: transcriptSrt,
                 transcriptPath: transcriptPath,
+                resolution: resolution,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

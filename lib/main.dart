@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_notifier/local_notifier.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
@@ -19,6 +20,8 @@ Future<void> main() async {
   final engineManager = EngineManager(
     dataDirectory: Directory('${supportDir.path}${Platform.pathSeparator}engine'),
   );
+
+  await localNotifier.setup(appName: 'Downpour');
 
   await windowManager.ensureInitialized();
   const options = WindowOptions(

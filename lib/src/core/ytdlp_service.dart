@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'friendly_errors.dart';
 import 'models.dart';
 
 class YtDlpException implements Exception {
@@ -33,9 +34,12 @@ class ProcessingEvent extends DownloadEvent {
 }
 
 class DoneEvent extends DownloadEvent {
-  const DoneEvent(this.filePath);
+  const DoneEvent(this.filePath, {this.resolution});
 
   final String? filePath;
+
+  /// What actually got downloaded, e.g. "1080p" or "audio".
+  final String? resolution;
 }
 
 class FailedEvent extends DownloadEvent {
@@ -90,6 +94,10 @@ class YtDlpService {
       '--no-simulate',
       '--print',
       'after_move:filepath',
+      // Reports what was actually downloaded so the UI can show the real
+      // quality instead of the requested preset.
+      '--print',
+      'after_move:DR|%(resolution)s',
       if (ffmpegPath != null) ...['--ffmpeg-location', ffmpegPath],
       // Preset in the filename so the same video can exist at several
       // qualities; otherwise yt-dlp sees the file and skips the download.
@@ -103,6 +111,7 @@ class YtDlpService {
     final controller = StreamController<DownloadEvent>();
     final stderrTail = <String>[];
     String? finalPath;
+    String? resolution;
     var sawFullProgress = false;
 
     process.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
@@ -112,6 +121,8 @@ class YtDlpService {
           if ((event.fraction ?? 0) >= 0.999) sawFullProgress = true;
           controller.add(event);
         }
+      } else if (line.startsWith('DR|')) {
+        resolution = _friendlyResolution(line.substring(3).trim());
       } else if (line.startsWith('/') || RegExp(r'^[A-Za-z]:\\').hasMatch(line)) {
         finalPath = line.trim();
         if (sawFullProgress) controller.add(const ProcessingEvent());
@@ -125,7 +136,7 @@ class YtDlpService {
 
     unawaited(process.exitCode.then((code) async {
       if (code == 0) {
-        controller.add(DoneEvent(finalPath));
+        controller.add(DoneEvent(finalPath, resolution: resolution));
       } else if (code == -15 || code == 143 || code == 1 && finalPath == null && stderrTail.isEmpty) {
         // SIGTERM from cancel; the notifier already marked the task canceled.
         controller.add(const FailedEvent('Canceled'));
@@ -136,6 +147,15 @@ class YtDlpService {
     }));
 
     return DownloadHandle._(controller.stream, process);
+  }
+
+  /// "1920x1080" -> "1080p", "audio only" -> "audio", passthrough otherwise.
+  String? _friendlyResolution(String raw) {
+    if (raw.isEmpty || raw == 'NA') return null;
+    final match = RegExp(r'^(\d+)x(\d+)$').firstMatch(raw);
+    if (match != null) return '${match.group(2)}p';
+    if (raw.contains('audio')) return 'audio';
+    return raw;
   }
 
   ProgressEvent? _parseProgress(String line) {
@@ -160,8 +180,12 @@ class YtDlpService {
 
   String _tail(String stderr) {
     final lines = stderr.trim().split('\n').where((l) => l.trim().isNotEmpty).toList();
-    if (lines.isEmpty) return 'yt-dlp failed with no error output';
+    if (lines.isEmpty) return 'The download engine failed without an error message.';
     final errorLine = lines.lastWhere((l) => l.contains('ERROR'), orElse: () => lines.last);
-    return errorLine.replaceFirst(RegExp(r'^ERROR:\s*'), '').trim();
+    final raw = errorLine
+        .replaceFirst(RegExp(r'^ERROR:\s*'), '')
+        .replaceFirst(RegExp(r'^\[[^\]]+\]\s*[\w-]*:?\s*'), '')
+        .trim();
+    return friendlyEngineError(raw);
   }
 }

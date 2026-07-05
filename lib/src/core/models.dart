@@ -81,6 +81,7 @@ class DownloadTask {
     this.etaSeconds,
     this.filePath,
     this.error,
+    this.resolution,
   });
 
   final String id;
@@ -103,6 +104,9 @@ class DownloadTask {
   final String? filePath;
   final String? error;
 
+  /// What was actually downloaded, e.g. "1080p" or "audio".
+  final String? resolution;
+
   DownloadTask copyWith({
     DownloadStatus? status,
     int? recordId,
@@ -114,6 +118,7 @@ class DownloadTask {
     int? etaSeconds,
     String? filePath,
     String? error,
+    String? resolution,
   }) =>
       DownloadTask(
         id: id,
@@ -129,6 +134,7 @@ class DownloadTask {
         etaSeconds: etaSeconds ?? this.etaSeconds,
         filePath: filePath ?? this.filePath,
         error: error ?? this.error,
+        resolution: resolution ?? this.resolution,
       );
 
   String get displayTitle => info?.title ?? url;

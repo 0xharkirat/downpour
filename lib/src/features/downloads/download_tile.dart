@@ -143,7 +143,8 @@ class _SubtitleLine extends StatelessWidget {
 
   String get _doneLine {
     final parts = [
-      task.preset.label,
+      // The real downloaded quality beats the requested preset when known.
+      task.resolution ?? task.preset.label,
       if (task.info?.uploader != null) task.info!.uploader!,
       if (task.info?.durationSeconds != null) formatDuration(task.info!.durationSeconds),
     ];
@@ -183,8 +184,14 @@ class _Actions extends StatelessWidget {
             () => context.go('/transcript/${task.recordId}'),
             label: 'Transcript',
           ),
-        if (!task.status.isActive)
+        if (!task.status.isActive) ...[
+          iconButton(
+            FLucideIcons.refreshCw,
+            () => notifier.enqueue(task.url, task.preset, info: task.info),
+            label: 'Download again',
+          ),
           iconButton(FLucideIcons.trash2, () => notifier.remove(task.id), label: 'Remove'),
+        ],
       ],
     );
   }
