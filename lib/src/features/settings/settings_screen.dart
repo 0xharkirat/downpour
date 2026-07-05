@@ -124,27 +124,7 @@ class SettingsScreen extends ConsumerWidget {
                                         'single-file formats and audio saves as M4A',
                               ),
                               const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  FButton(
-                                    variant: FButtonVariant.outline,
-                                    size: FButtonSizeVariant.sm,
-                                    mainAxisSize: MainAxisSize.min,
-                                    prefix: const Icon(FLucideIcons.hardDriveDownload),
-                                    onPress: () => ref.read(engineProvider.notifier).installManaged(),
-                                    child: const Text('Install / update engine'),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Fetches the latest yt-dlp and ffmpeg. Do this when '
-                                      'downloads fail or quality drops — sites break old versions.',
-                                      style: theme.typography.body.xs
-                                          .copyWith(color: theme.colors.mutedForeground),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              const _EngineUpdateRow(),
                             ],
                           ),
                         AsyncError(:final error) => Row(
@@ -168,10 +148,18 @@ class SettingsScreen extends ConsumerWidget {
                         _ => Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _EngineStatus(
-                                icon: FLucideIcons.loaderCircle,
-                                color: theme.colors.mutedForeground,
-                                text: setup?.label ?? 'Setting up engine…',
+                              Row(
+                                children: [
+                                  const FCircularProgress.loader(size: FCircularProgressSizeVariant.sm),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      setup?.label ?? 'Setting up engine…',
+                                      style: theme.typography.body.xs
+                                          .copyWith(color: theme.colors.mutedForeground),
+                                    ),
+                                  ),
+                                ],
                               ),
                               if (setup?.fraction != null) ...[
                                 const SizedBox(height: 8),
@@ -295,6 +283,109 @@ class SettingsScreen extends ConsumerWidget {
         BinarySource.system => 'system install',
         BinarySource.custom => 'custom path',
       };
+}
+
+/// Check-for-updates flow: only offers a download when a newer yt-dlp
+/// release exists, and shows when the engine was last updated.
+class _EngineUpdateRow extends ConsumerWidget {
+  const _EngineUpdateRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = context.theme;
+    final update = ref.watch(engineUpdateProvider);
+    final notifier = ref.read(engineUpdateProvider.notifier);
+    final muted = theme.typography.body.xs.copyWith(color: theme.colors.mutedForeground);
+
+    final Widget status = switch (update.phase) {
+      EngineUpdatePhase.checking => Row(
+          children: [
+            const FCircularProgress.loader(size: FCircularProgressSizeVariant.sm),
+            const SizedBox(width: 6),
+            Text('Checking for updates…', style: muted),
+          ],
+        ),
+      EngineUpdatePhase.installing => Row(
+          children: [
+            const FCircularProgress.loader(size: FCircularProgressSizeVariant.sm),
+            const SizedBox(width: 6),
+            Text('Installing…', style: muted),
+          ],
+        ),
+      EngineUpdatePhase.upToDate => Row(
+          children: [
+            Icon(FLucideIcons.circleCheck, size: 14, color: theme.colors.primary),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                update.message ?? "You're up to date (${update.latestVersion}).",
+                style: muted,
+              ),
+            ),
+          ],
+        ),
+      EngineUpdatePhase.updateAvailable => Row(
+          children: [
+            Icon(FLucideIcons.hardDriveDownload, size: 14, color: theme.colors.primary),
+            const SizedBox(width: 6),
+            Expanded(child: Text(update.message ?? '', style: muted)),
+          ],
+        ),
+      EngineUpdatePhase.error => Row(
+          children: [
+            Icon(FLucideIcons.circleX, size: 14, color: theme.colors.destructive),
+            const SizedBox(width: 6),
+            Expanded(child: Text(update.message ?? 'Update check failed', style: muted)),
+          ],
+        ),
+      EngineUpdatePhase.idle => Text(
+          update.lastUpdated == null
+              ? 'Sites break old yt-dlp versions — check for updates when '
+                  'downloads fail or quality drops.'
+              : 'Engine last updated ${_formatDate(update.lastUpdated!)}.',
+          style: muted,
+        ),
+    };
+
+    final busy = update.phase == EngineUpdatePhase.checking ||
+        update.phase == EngineUpdatePhase.installing;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        status,
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            FButton(
+              variant: FButtonVariant.outline,
+              size: FButtonSizeVariant.sm,
+              mainAxisSize: MainAxisSize.min,
+              prefix: const Icon(FLucideIcons.refreshCw),
+              onPress: busy ? null : notifier.checkForUpdates,
+              child: const Text('Check for updates'),
+            ),
+            if (update.phase == EngineUpdatePhase.updateAvailable) ...[
+              const SizedBox(width: 8),
+              FButton(
+                size: FButtonSizeVariant.sm,
+                mainAxisSize: MainAxisSize.min,
+                prefix: const Icon(FLucideIcons.download),
+                onPress: busy ? null : notifier.install,
+                child: Text('Install ${update.latestVersion}'),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final local = date.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-'
+        '${local.day.toString().padLeft(2, '0')}';
+  }
 }
 
 class _SectionLabel extends StatelessWidget {

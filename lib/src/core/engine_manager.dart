@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'ytdlp_service.dart' show YtDlpException;
@@ -120,30 +121,64 @@ class EngineManager {
     );
   }
 
-  /// Force-installs the latest yt-dlp and ffmpeg into the managed directory.
-  /// The managed copies shadow bundled and system binaries from then on, so
-  /// this doubles as "update everything" — stale yt-dlp versions silently
-  /// lose access to high-quality formats as sites change.
-  Future<void> installManaged({
+  /// Latest yt-dlp release tag from GitHub, e.g. "2026.06.09".
+  Future<String> latestYtdlpVersion() async {
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(
+        Uri.parse('https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest'),
+      );
+      request.headers.set(HttpHeaders.acceptHeader, 'application/vnd.github+json');
+      final response = await request.close();
+      if (response.statusCode != 200) {
+        throw YtDlpException('Update check failed (HTTP ${response.statusCode})');
+      }
+      final body = await response.transform(utf8.decoder).join();
+      final tag = (jsonDecode(body) as Map<String, dynamic>)['tag_name'] as String?;
+      if (tag == null || tag.isEmpty) throw YtDlpException('Update check returned no version');
+      return tag;
+    } on SocketException {
+      throw YtDlpException('Update check failed: no internet connection');
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Installs the latest yt-dlp into the managed directory (shadowing bundled
+  /// and system copies) and provisions ffmpeg if missing. Skips the download
+  /// when the managed copy is already the latest release, unless [force].
+  /// Returns the installed version.
+  Future<String> installManaged({
+    bool force = false,
     void Function(EngineSetupProgress progress)? onProgress,
   }) async {
     await dataDirectory.create(recursive: true);
 
-    onProgress?.call(const EngineSetupProgress('Downloading yt-dlp…'));
-    final temp = File('$_managedYtdlp.part');
-    await _download(
-      _ytdlpDownloads[_os]!,
-      temp,
-      (fraction) => onProgress?.call(EngineSetupProgress('Downloading yt-dlp…', fraction)),
-    );
-    if (await File(_managedYtdlp).exists()) await File(_managedYtdlp).delete();
-    await temp.rename(_managedYtdlp);
-    await _markExecutable(_managedYtdlp);
-    await _runVersion(_managedYtdlp);
+    onProgress?.call(const EngineSetupProgress('Checking latest version…'));
+    final latest = await latestYtdlpVersion();
 
-    final ffmpeg = File(_managedFfmpeg);
-    if (await ffmpeg.exists()) await ffmpeg.delete();
+    var current = '';
+    if (await File(_managedYtdlp).exists()) {
+      current = await _runVersion(_managedYtdlp);
+    }
+
+    if (force || current != latest) {
+      onProgress?.call(const EngineSetupProgress('Downloading yt-dlp…'));
+      final temp = File('$_managedYtdlp.part');
+      await _download(
+        _ytdlpDownloads[_os]!,
+        temp,
+        (fraction) => onProgress?.call(EngineSetupProgress('Downloading yt-dlp…', fraction)),
+      );
+      if (await File(_managedYtdlp).exists()) await File(_managedYtdlp).delete();
+      await temp.rename(_managedYtdlp);
+      await _markExecutable(_managedYtdlp);
+      current = await _runVersion(_managedYtdlp);
+    }
+
+    // ffmpeg builds are not versioned the same way; fetch only when absent.
     await _ensureFfmpeg(onProgress);
+    return current;
   }
 
   Future<(String, BinarySource)> _ensureYtdlp(
