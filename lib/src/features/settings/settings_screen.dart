@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/engine_manager.dart';
 import '../../core/engine_provider.dart';
@@ -20,6 +21,7 @@ class SettingsScreen extends ConsumerWidget {
     final notifier = ref.read(settingsProvider.notifier);
     final downloadDir = ref.watch(downloadDirProvider);
     final engine = ref.watch(engineProvider);
+    final setup = ref.watch(engineSetupProgressProvider);
 
     return FScaffold(
       header: FHeader.nested(
@@ -121,18 +123,28 @@ class SettingsScreen extends ConsumerWidget {
                                     : 'ffmpeg unavailable — downloads fall back to '
                                         'single-file formats and audio saves as M4A',
                               ),
-                              if (value.ytdlpSource == BinarySource.managed ||
-                                  value.ytdlpSource == BinarySource.bundled) ...[
-                                const SizedBox(height: 10),
-                                FButton(
-                                  variant: FButtonVariant.outline,
-                                  size: FButtonSizeVariant.sm,
-                                  mainAxisSize: MainAxisSize.min,
-                                  prefix: const Icon(FLucideIcons.refreshCw),
-                                  onPress: () => ref.read(engineProvider.notifier).updateYtdlp(),
-                                  child: const Text('Update yt-dlp'),
-                                ),
-                              ],
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  FButton(
+                                    variant: FButtonVariant.outline,
+                                    size: FButtonSizeVariant.sm,
+                                    mainAxisSize: MainAxisSize.min,
+                                    prefix: const Icon(FLucideIcons.hardDriveDownload),
+                                    onPress: () => ref.read(engineProvider.notifier).installManaged(),
+                                    child: const Text('Install / update engine'),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Fetches the latest yt-dlp and ffmpeg. Do this when '
+                                      'downloads fail or quality drops — sites break old versions.',
+                                      style: theme.typography.body.xs
+                                          .copyWith(color: theme.colors.mutedForeground),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         AsyncError(:final error) => Row(
@@ -153,10 +165,19 @@ class SettingsScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
-                        _ => _EngineStatus(
-                            icon: FLucideIcons.loaderCircle,
-                            color: theme.colors.mutedForeground,
-                            text: 'Setting up engine…',
+                        _ => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _EngineStatus(
+                                icon: FLucideIcons.loaderCircle,
+                                color: theme.colors.mutedForeground,
+                                text: setup?.label ?? 'Setting up engine…',
+                              ),
+                              if (setup?.fraction != null) ...[
+                                const SizedBox(height: 8),
+                                FDeterminateProgress(value: setup!.fraction!),
+                              ],
+                            ],
                           ),
                       },
                       const SizedBox(height: 16),
@@ -168,6 +189,61 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         hint: 'Managed automatically when empty',
                         onSubmit: notifier.setYtdlpPath,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _SectionLabel('About'),
+              FCard.raw(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(FLucideIcons.hardDriveDownload, size: 18, color: theme.colors.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Downpour',
+                            style: theme.typography.body.md.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colors.foreground,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('0.1.0', style: theme.typography.body.xs.copyWith(color: theme.colors.mutedForeground)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Free, open-source video downloader for the desktop. Downloads are '
+                        'powered by yt-dlp with ffmpeg handling merging and audio conversion — '
+                        'both installed and updated for you, no terminal needed. '
+                        'Only download content you have the right to save.',
+                        style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          for (final (label, url) in [
+                            ('Downpour on GitHub', 'https://github.com/0xharkirat/downpour'),
+                            ('yt-dlp', 'https://github.com/yt-dlp/yt-dlp'),
+                            ('ffmpeg', 'https://ffmpeg.org'),
+                          ]) ...[
+                            FButton(
+                              variant: FButtonVariant.outline,
+                              size: FButtonSizeVariant.sm,
+                              mainAxisSize: MainAxisSize.min,
+                              prefix: const Icon(FLucideIcons.externalLink),
+                              onPress: () => launchUrl(Uri.parse(url)),
+                              child: Text(label),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
                       ),
                     ],
                   ),

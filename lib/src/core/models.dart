@@ -55,11 +55,12 @@ class VideoInfo {
   final String? extractor;
 }
 
-enum DownloadStatus { fetching, downloading, processing, done, error, canceled }
+enum DownloadStatus { fetching, starting, downloading, processing, done, error, canceled }
 
 extension DownloadStatusX on DownloadStatus {
   bool get isActive =>
       this == DownloadStatus.fetching ||
+      this == DownloadStatus.starting ||
       this == DownloadStatus.downloading ||
       this == DownloadStatus.processing;
 }
@@ -71,6 +72,7 @@ class DownloadTask {
     required this.url,
     required this.preset,
     required this.status,
+    this.recordId,
     this.info,
     this.progress,
     this.downloadedBytes,
@@ -82,6 +84,9 @@ class DownloadTask {
   });
 
   final String id;
+
+  /// Row id in the history database once persisted.
+  final int? recordId;
   final String url;
   final QualityPreset preset;
   final DownloadStatus status;
@@ -100,6 +105,7 @@ class DownloadTask {
 
   DownloadTask copyWith({
     DownloadStatus? status,
+    int? recordId,
     VideoInfo? info,
     double? progress,
     int? downloadedBytes,
@@ -114,6 +120,7 @@ class DownloadTask {
         url: url,
         preset: preset,
         status: status ?? this.status,
+        recordId: recordId ?? this.recordId,
         info: info ?? this.info,
         progress: progress ?? this.progress,
         downloadedBytes: downloadedBytes ?? this.downloadedBytes,

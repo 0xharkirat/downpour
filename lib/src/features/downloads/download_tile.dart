@@ -42,6 +42,10 @@ class DownloadTile extends ConsumerWidget {
                   if (task.status == DownloadStatus.downloading) ...[
                     const SizedBox(height: 10),
                     FDeterminateProgress(value: task.progress ?? 0),
+                  ] else if (task.status == DownloadStatus.starting ||
+                      task.status == DownloadStatus.processing) ...[
+                    const SizedBox(height: 10),
+                    const FProgress(),
                   ],
                 ],
               ),
@@ -102,6 +106,7 @@ class _SubtitleLine extends StatelessWidget {
 
     final text = switch (task.status) {
       DownloadStatus.fetching => 'Fetching info…',
+      DownloadStatus.starting => 'Starting download…',
       DownloadStatus.downloading =>
         '${formatBytes(task.downloadedBytes)} of ${formatBytes(task.totalBytes)}'
             '  ·  ${formatSpeed(task.speed)}  ·  ${formatEta(task.etaSeconds)} left',

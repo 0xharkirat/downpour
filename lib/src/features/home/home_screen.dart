@@ -5,10 +5,12 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/engine_provider.dart';
+import '../../core/format.dart';
 import '../../core/models.dart';
 import '../../core/settings.dart';
 import '../downloads/download_tile.dart';
 import '../downloads/downloads_provider.dart';
+import 'preview_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +21,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _urlController = TextEditingController();
-  QualityPreset? _preset;
 
   @override
   void dispose() {
@@ -27,30 +28,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  QualityPreset get _effectivePreset =>
-      _preset ?? ref.read(settingsProvider).defaultPreset;
-
-  Future<void> _pasteAndDownload() async {
+  Future<void> _paste() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text?.trim();
     if (text == null || text.isEmpty) return;
     _urlController.text = text;
-    _submit(text);
+    _fetch(text);
   }
 
-  void _submit(String value) {
+  void _fetch(String value) {
     final url = value.trim();
     if (url.isEmpty || !url.contains('.')) return;
     final normalized = url.startsWith('http') ? url : 'https://$url';
-    ref.read(downloadsProvider.notifier).enqueue(normalized, _effectivePreset);
-    _urlController.clear();
+    ref.read(previewProvider.notifier).fetch(normalized);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
     final tasks = ref.watch(downloadsProvider);
-    final selectedPreset = _preset ?? ref.watch(settingsProvider.select((s) => s.defaultPreset));
     final hasFinished = tasks.any((t) => !t.status.isActive);
 
     return FScaffold(
@@ -81,44 +77,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 const SizedBox(height: 16),
                 const _EngineBanner(),
-                FTextField(
-                  control: FTextFieldControl.managed(controller: _urlController),
-                  hint: 'Paste a video link — YouTube, Vimeo, X, and 1800+ sites',
-                  keyboardType: TextInputType.url,
-                  textInputAction: TextInputAction.go,
-                  onSubmit: _submit,
-                  autofocus: true,
-                ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
-                    for (final preset in QualityPreset.values) ...[
-                      FButton(
-                        variant: selectedPreset == preset ? FButtonVariant.primary : FButtonVariant.outline,
-                        size: FButtonSizeVariant.sm,
-                        mainAxisSize: MainAxisSize.min,
-                        onPress: () => setState(() => _preset = preset),
-                        child: Text(preset.label),
+                    Expanded(
+                      child: FTextField(
+                        control: FTextFieldControl.managed(controller: _urlController),
+                        hint: 'Paste a video link — YouTube, Vimeo, X, and 1800+ sites',
+                        keyboardType: TextInputType.url,
+                        textInputAction: TextInputAction.go,
+                        onSubmit: _fetch,
+                        autofocus: true,
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    const Spacer(),
+                    ),
+                    const SizedBox(width: 8),
                     FButton(
-                      size: FButtonSizeVariant.sm,
                       mainAxisSize: MainAxisSize.min,
-                      onPress: _pasteAndDownload,
+                      onPress: _paste,
                       prefix: const Icon(FLucideIcons.clipboardPaste),
-                      child: const Text('Paste & download'),
+                      child: const Text('Paste'),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+                const _PreviewCard(),
                 Expanded(
                   child: tasks.isEmpty
                       ? const _EmptyState()
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            const SizedBox(height: 8),
                             Row(
                               children: [
                                 Text('Downloads', style: theme.typography.body.lg.copyWith(
@@ -156,6 +144,169 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Fetched metadata for the pasted link: thumbnail, title, duration, and the
+/// quality picker. Downloading only starts from here.
+class _PreviewCard extends ConsumerStatefulWidget {
+  const _PreviewCard();
+
+  @override
+  ConsumerState<_PreviewCard> createState() => _PreviewCardState();
+}
+
+class _PreviewCardState extends ConsumerState<_PreviewCard> {
+  QualityPreset? _preset;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+    final preview = ref.watch(previewProvider);
+    final QualityPreset selected =
+        _preset ?? ref.watch(settingsProvider.select((s) => s.defaultPreset));
+
+    final Widget? content = switch (preview) {
+      AsyncLoading() => Row(
+          children: [
+            const FCircularProgress.loader(),
+            const SizedBox(width: 10),
+            Text(
+              'Fetching video details…',
+              style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
+            ),
+          ],
+        ),
+      AsyncError(:final error) => Row(
+          children: [
+            Icon(FLucideIcons.circleX, size: 16, color: theme.colors.destructive),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '$error',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
+              ),
+            ),
+            FButton(
+              variant: FButtonVariant.ghost,
+              size: FButtonSizeVariant.sm,
+              mainAxisSize: MainAxisSize.min,
+              onPress: () => ref.read(previewProvider.notifier).clear(),
+              child: const Icon(FLucideIcons.x, size: 14),
+            ),
+          ],
+        ),
+      AsyncData(:final value?) => _details(theme, value, selected),
+      _ => null,
+    };
+
+    if (content == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: FCard.raw(
+        child: Padding(padding: const EdgeInsets.all(14), child: content),
+      ),
+    );
+  }
+
+  Widget _details(FThemeData theme, VideoInfo info, QualityPreset selected) {
+    final muted = theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: info.thumbnail == null
+                  ? Container(
+                      width: 168,
+                      height: 94,
+                      color: theme.colors.secondary,
+                      child: Icon(FLucideIcons.film, size: 28, color: theme.colors.mutedForeground),
+                    )
+                  : Image.network(
+                      info.thumbnail!,
+                      width: 168,
+                      height: 94,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        width: 168,
+                        height: 94,
+                        color: theme.colors.secondary,
+                        child: Icon(FLucideIcons.film, size: 28, color: theme.colors.mutedForeground),
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    info.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.body.md.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colors.foreground,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      if (info.uploader != null) info.uploader!,
+                      if (info.durationSeconds != null) formatDuration(info.durationSeconds),
+                    ].join('  ·  '),
+                    style: muted,
+                  ),
+                ],
+              ),
+            ),
+            FButton(
+              variant: FButtonVariant.ghost,
+              size: FButtonSizeVariant.sm,
+              mainAxisSize: MainAxisSize.min,
+              semanticsLabel: 'Dismiss preview',
+              onPress: () => ref.read(previewProvider.notifier).clear(),
+              child: const Icon(FLucideIcons.x, size: 14),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            for (final preset in QualityPreset.values) ...[
+              FButton(
+                variant: selected == preset ? FButtonVariant.primary : FButtonVariant.outline,
+                size: FButtonSizeVariant.sm,
+                mainAxisSize: MainAxisSize.min,
+                onPress: () => setState(() => _preset = preset),
+                child: Text(preset.label),
+              ),
+              const SizedBox(width: 8),
+            ],
+            const Spacer(),
+            FButton(
+              mainAxisSize: MainAxisSize.min,
+              prefix: const Icon(FLucideIcons.download),
+              onPress: () {
+                ref.read(downloadsProvider.notifier).enqueue(
+                      info.webpageUrl,
+                      selected,
+                      info: info,
+                    );
+                ref.read(previewProvider.notifier).clear();
+              },
+              child: const Text('Download'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -252,7 +403,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Paste a link above and press Enter to start.',
+            'Paste a link above to see the video details.',
             style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
           ),
         ],

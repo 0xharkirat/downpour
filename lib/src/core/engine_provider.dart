@@ -37,11 +37,17 @@ class EngineNotifier extends AsyncNotifier<EngineStatus> {
     }
   }
 
-  Future<void> updateYtdlp() async {
-    final current = state.value;
-    if (current == null) return;
+  /// Installs the latest managed yt-dlp + ffmpeg (also serves as update).
+  Future<void> installManaged() async {
     state = const AsyncLoading<EngineStatus>();
-    await ref.read(engineManagerProvider).updateYtdlp(current);
+    try {
+      await ref.read(engineManagerProvider).installManaged(
+            onProgress: (progress) =>
+                ref.read(engineSetupProgressProvider.notifier).set(progress),
+          );
+    } finally {
+      ref.read(engineSetupProgressProvider.notifier).set(null);
+    }
     ref.invalidateSelf();
   }
 

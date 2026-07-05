@@ -120,27 +120,30 @@ class EngineManager {
     );
   }
 
-  /// Updates yt-dlp. Managed copies self-update via -U; a bundled copy lives
-  /// inside the (read-only, signed) app package, so the latest release is
-  /// downloaded into the managed dir, which shadows it from then on.
-  Future<void> updateYtdlp(EngineStatus current) async {
-    switch (current.ytdlpSource) {
-      case BinarySource.managed:
-        final result = await Process.run(current.ytdlpPath, ['-U']);
-        if (result.exitCode != 0) {
-          throw YtDlpException('Update failed: ${(result.stderr as String).trim()}');
-        }
-      case BinarySource.bundled:
-        await dataDirectory.create(recursive: true);
-        final temp = File('$_managedYtdlp.part');
-        await _download(_ytdlpDownloads[_os]!, temp, (_) {});
-        await temp.rename(_managedYtdlp);
-        await _markExecutable(_managedYtdlp);
-        await _runVersion(_managedYtdlp);
-      case BinarySource.system || BinarySource.custom:
-        // The user owns these installs; leave them alone.
-        return;
-    }
+  /// Force-installs the latest yt-dlp and ffmpeg into the managed directory.
+  /// The managed copies shadow bundled and system binaries from then on, so
+  /// this doubles as "update everything" — stale yt-dlp versions silently
+  /// lose access to high-quality formats as sites change.
+  Future<void> installManaged({
+    void Function(EngineSetupProgress progress)? onProgress,
+  }) async {
+    await dataDirectory.create(recursive: true);
+
+    onProgress?.call(const EngineSetupProgress('Downloading yt-dlp…'));
+    final temp = File('$_managedYtdlp.part');
+    await _download(
+      _ytdlpDownloads[_os]!,
+      temp,
+      (fraction) => onProgress?.call(EngineSetupProgress('Downloading yt-dlp…', fraction)),
+    );
+    if (await File(_managedYtdlp).exists()) await File(_managedYtdlp).delete();
+    await temp.rename(_managedYtdlp);
+    await _markExecutable(_managedYtdlp);
+    await _runVersion(_managedYtdlp);
+
+    final ffmpeg = File(_managedFfmpeg);
+    if (await ffmpeg.exists()) await ffmpeg.delete();
+    await _ensureFfmpeg(onProgress);
   }
 
   Future<(String, BinarySource)> _ensureYtdlp(

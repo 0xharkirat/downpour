@@ -91,8 +91,10 @@ class YtDlpService {
       '--print',
       'after_move:filepath',
       if (ffmpegPath != null) ...['--ffmpeg-location', ffmpegPath],
+      // Preset in the filename so the same video can exist at several
+      // qualities; otherwise yt-dlp sees the file and skips the download.
       '-o',
-      '$directory${Platform.pathSeparator}%(title)s.%(ext)s',
+      '$directory${Platform.pathSeparator}%(title)s [${preset.label}].%(ext)s',
       ...preset.args(ffmpegAvailable: ffmpegPath != null),
       url,
     ];

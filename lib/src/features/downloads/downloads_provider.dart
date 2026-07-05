@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/database.dart';
 import '../../core/engine_provider.dart';
 import '../../core/models.dart';
 import '../../core/settings.dart';
@@ -19,12 +21,27 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
         handle.cancel();
       }
     });
+    scheduleMicrotask(_loadHistory);
     return const [];
   }
 
-  Future<void> enqueue(String url, QualityPreset preset) async {
+  Future<void> _loadHistory() async {
+    final records = await ref.read(databaseProvider).allRecords();
+    final active = state.where((t) => t.recordId == null);
+    state = [...active, ...records.map((r) => r.toTask())];
+  }
+
+  /// Starts a download. [info] comes from the preview step; when absent
+  /// (e.g. direct submit), metadata is fetched first.
+  Future<void> enqueue(String url, QualityPreset preset, {VideoInfo? info}) async {
     final id = 'task-${_nextId++}';
-    final task = DownloadTask(id: id, url: url.trim(), preset: preset, status: DownloadStatus.fetching);
+    final task = DownloadTask(
+      id: id,
+      url: url.trim(),
+      preset: preset,
+      status: info == null ? DownloadStatus.fetching : DownloadStatus.starting,
+      info: info,
+    );
     state = [task, ...state];
 
     final service = ref.read(ytDlpServiceProvider);
@@ -33,8 +50,10 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
       // Waits for first-launch engine setup; tasks queue up meanwhile.
       final engine = await ref.read(engineProvider.future);
 
-      final info = await service.fetchInfo(task.url, binary: engine.ytdlpPath);
-      _update(id, (t) => t.copyWith(info: info, status: DownloadStatus.downloading));
+      if (info == null) {
+        final fetched = await service.fetchInfo(task.url, binary: engine.ytdlpPath);
+        _update(id, (t) => t.copyWith(info: fetched, status: DownloadStatus.starting));
+      }
 
       final directory = await ref.read(downloadDirProvider.future);
       await Directory(directory).create(recursive: true);
@@ -67,32 +86,61 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
           case DoneEvent(:final filePath):
             _handles.remove(id);
             _update(id, (t) => t.copyWith(status: DownloadStatus.done, progress: 1, filePath: filePath));
+            _persist(id);
           case FailedEvent(:final message):
             _handles.remove(id);
             _update(id, (t) {
               if (t.status == DownloadStatus.canceled) return t;
               return t.copyWith(status: DownloadStatus.error, error: message);
             });
+            _persist(id);
         }
       });
     } on YtDlpException catch (e) {
       _update(id, (t) => t.copyWith(status: DownloadStatus.error, error: e.message));
+      _persist(id);
     } catch (e) {
       _update(id, (t) => t.copyWith(status: DownloadStatus.error, error: '$e'));
+      _persist(id);
     }
+  }
+
+  Future<void> _persist(String id) async {
+    final task = state.where((t) => t.id == id).firstOrNull;
+    if (task == null || task.recordId != null) return;
+    final recordId = await ref.read(databaseProvider).insertRecord(
+          DownloadRecordsCompanion.insert(
+            url: task.url,
+            title: task.displayTitle,
+            uploader: Value(task.info?.uploader),
+            thumbnail: Value(task.info?.thumbnail),
+            durationSeconds: Value(task.info?.durationSeconds),
+            preset: task.preset.name,
+            status: task.status.name,
+            filePath: Value(task.filePath),
+            error: Value(task.error),
+          ),
+        );
+    _update(id, (t) => t.copyWith(recordId: recordId));
   }
 
   void cancel(String id) {
     _update(id, (t) => t.copyWith(status: DownloadStatus.canceled));
     _handles.remove(id)?.cancel();
+    _persist(id);
   }
 
   void remove(String id) {
     _handles.remove(id)?.cancel();
+    final task = state.where((t) => t.id == id).firstOrNull;
+    if (task?.recordId != null) {
+      ref.read(databaseProvider).deleteRecord(task!.recordId!);
+    }
     state = state.where((t) => t.id != id).toList();
   }
 
   void clearFinished() {
+    ref.read(databaseProvider).deleteFinished();
     state = state.where((t) => t.status.isActive).toList();
   }
 

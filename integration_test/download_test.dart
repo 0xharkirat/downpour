@@ -35,26 +35,32 @@ Future<void> waitFor(
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  patrolWidgetTest('downloads a video end to end', ($) async {
+  patrolWidgetTest('previews then downloads a video end to end', ($) async {
     await app.main();
     await $.pump(const Duration(seconds: 1));
 
-    // Engine resolves (custom/managed/bundled/system) and the empty state shows.
-    await waitFor($, find.text('No downloads yet'), timeout: const Duration(minutes: 2));
+    // History from earlier runs would satisfy the done-state finders below;
+    // start from a clean list.
+    await $.pump(const Duration(seconds: 1));
+    if (find.text('Clear finished').evaluate().isNotEmpty) {
+      await $('Clear finished').tap(settlePolicy: SettlePolicy.noSettle);
+      await $.pump(const Duration(seconds: 1));
+    }
 
-    // The real user path: URL on the clipboard, one click.
+    // Step 1: paste → preview with details, no download yet.
     await Clipboard.setData(const ClipboardData(text: _testUrl));
-    await $('Paste & download').tap(settlePolicy: SettlePolicy.noSettle);
+    await $('Paste').tap(settlePolicy: SettlePolicy.noSettle);
+    await waitFor($, find.textContaining(_testTitle), timeout: const Duration(minutes: 2));
+    expect(find.text('Download'), findsOneWidget);
+
+    // Step 2: explicit download.
+    await $('Download').tap(settlePolicy: SettlePolicy.noSettle);
     await $.pump(const Duration(seconds: 1));
 
-    // Tile appears with the URL immediately, then the real title once
-    // metadata lands.
-    await waitFor($, find.textContaining(_testTitle), timeout: const Duration(minutes: 1));
+    // Done state: the tile shows open/reveal actions.
+    await waitFor($, find.byIcon(FLucideIcons.play));
 
-    // Done state: subtitle shows "<preset> · <uploader> · <duration>".
-    await waitFor($, find.textContaining('jawed'));
-
-    // File really landed in the download folder.
+    // File really landed, with the quality label in the name.
     final home = Platform.environment['HOME']!;
     final downloaded = Directory('$home/Downloads')
         .listSync()
@@ -62,6 +68,11 @@ void main() {
         .where((f) => f.uri.pathSegments.last.startsWith(_testTitle))
         .toList();
     expect(downloaded, isNotEmpty, reason: 'downloaded file should be in ~/Downloads');
+    expect(
+      downloaded.any((f) => f.uri.pathSegments.last.contains('[')),
+      isTrue,
+      reason: 'filename should carry the quality label',
+    );
     for (final file in downloaded) {
       expect(file.lengthSync(), greaterThan(100 * 1024));
       file.deleteSync(); // keep the user's Downloads clean
@@ -79,5 +90,7 @@ void main() {
     await waitFor($, find.text('Settings'));
     // Engine card eventually reports a resolved yt-dlp with its version.
     await waitFor($, find.textContaining('yt-dlp 2'), timeout: const Duration(minutes: 2));
+    // About section present.
+    await waitFor($, find.textContaining('open-source video downloader'));
   });
 }
