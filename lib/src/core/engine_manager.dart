@@ -188,7 +188,7 @@ class EngineManager {
     if (override != null && override.trim().isNotEmpty) {
       final path = override.trim();
       if (!await File(path).exists()) {
-        throw YtDlpException('yt-dlp not found at $path — clear the custom path in Settings.');
+        throw YtDlpException('yt-dlp not found at $path. Clear the custom path in Settings.');
       }
       return (path, BinarySource.custom);
     }

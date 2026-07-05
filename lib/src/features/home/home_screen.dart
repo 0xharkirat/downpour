@@ -38,7 +38,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _fetch(String value) {
     final url = value.trim();
-    if (url.isEmpty || !url.contains('.')) return;
+    if (url.isEmpty) return;
+    if (!url.contains('.') || url.contains(' ')) {
+      ref.read(previewProvider.notifier).rejectInput();
+      return;
+    }
     final normalized = url.startsWith('http') ? url : 'https://$url';
     ref.read(previewProvider.notifier).fetch(normalized);
   }
@@ -82,7 +86,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     Expanded(
                       child: FTextField(
                         control: FTextFieldControl.managed(controller: _urlController),
-                        hint: 'Paste a video link — YouTube, Vimeo, X, and 1800+ sites',
+                        hint: 'Paste a video link from YouTube, Vimeo, X, and 1800+ other sites',
                         keyboardType: TextInputType.url,
                         textInputAction: TextInputAction.go,
                         onSubmit: _fetch,

@@ -10,6 +10,14 @@ class PreviewNotifier extends AsyncNotifier<VideoInfo?> {
   @override
   Future<VideoInfo?> build() async => null;
 
+  /// Shown when the input clearly is not a link, instead of doing nothing.
+  void rejectInput() {
+    state = AsyncError<VideoInfo?>(
+      'That does not look like a video link. Copy the address from your browser and try again.',
+      StackTrace.current,
+    );
+  }
+
   Future<void> fetch(String url) async {
     state = const AsyncLoading<VideoInfo?>();
     state = await AsyncValue.guard(() async {

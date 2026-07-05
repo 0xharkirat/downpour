@@ -120,8 +120,8 @@ class SettingsScreen extends ConsumerWidget {
                                     : theme.colors.destructive,
                                 text: value.ffmpegAvailable
                                     ? 'ffmpeg · ${value.ffmpegPath}'
-                                    : 'ffmpeg unavailable — downloads fall back to '
-                                        'single-file formats and audio saves as M4A',
+                                    : 'ffmpeg unavailable. Downloads fall back to '
+                                        'single-file formats and audio saves as M4A.',
                               ),
                               const SizedBox(height: 10),
                               const _EngineUpdateRow(),
@@ -207,9 +207,7 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Free, open-source video downloader for the desktop. Downloads are '
-                        'powered by yt-dlp with ffmpeg handling merging and audio conversion — '
-                        'both installed and updated for you, no terminal needed. '
+                        'Free, open-source video downloader powered by yt-dlp and ffmpeg. '
                         'Only download content you have the right to save.',
                         style: theme.typography.body.sm.copyWith(color: theme.colors.mutedForeground),
                       ),
@@ -340,8 +338,7 @@ class _EngineUpdateRow extends ConsumerWidget {
         ),
       EngineUpdatePhase.idle => Text(
           update.lastUpdated == null
-              ? 'Sites break old yt-dlp versions — check for updates when '
-                  'downloads fail or quality drops.'
+              ? 'Check for updates if downloads fail or quality drops.'
               : 'Engine last updated ${_formatDate(update.lastUpdated!)}.',
           style: muted,
         ),
