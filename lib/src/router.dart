@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'features/home/home_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/transcript/transcript_screen.dart';
 
 final routerProvider = Provider<GoRouter>(
   (ref) => GoRouter(
@@ -12,6 +13,12 @@ final routerProvider = Provider<GoRouter>(
         path: '/',
         builder: (context, state) => const HomeScreen(),
         routes: [
+          GoRoute(
+            path: 'transcript/:id',
+            builder: (context, state) => TranscriptScreen(
+              recordId: int.parse(state.pathParameters['id']!),
+            ),
+          ),
           GoRoute(
             path: 'settings',
             pageBuilder: (context, state) => CustomTransitionPage(

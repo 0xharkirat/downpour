@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
 import '../../core/models.dart';
@@ -176,6 +177,12 @@ class _Actions extends StatelessWidget {
           iconButton(FLucideIcons.play, () => notifier.openFile(task), label: 'Open'),
           iconButton(FLucideIcons.folderOpen, () => notifier.revealInFolder(task), label: 'Show in folder'),
         ],
+        if (task.status == DownloadStatus.done && task.recordId != null)
+          iconButton(
+            FLucideIcons.captions,
+            () => context.go('/transcript/${task.recordId}'),
+            label: 'Transcript',
+          ),
         if (!task.status.isActive)
           iconButton(FLucideIcons.trash2, () => notifier.remove(task.id), label: 'Remove'),
       ],

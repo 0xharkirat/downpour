@@ -20,6 +20,10 @@ class DownloadRecords extends Table {
   TextColumn get filePath => text().nullable()();
   TextColumn get error => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  /// Cached transcript (SRT) and the sidecar file written next to the video.
+  TextColumn get transcriptSrt => text().nullable()();
+  TextColumn get transcriptPath => text().nullable()();
 }
 
 @DriftDatabase(tables: [DownloadRecords])
@@ -29,7 +33,17 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(downloadRecords, downloadRecords.transcriptSrt);
+            await m.addColumn(downloadRecords, downloadRecords.transcriptPath);
+          }
+        },
+      );
 
   static QueryExecutor _open() => driftDatabase(
         name: 'downpour',
@@ -46,6 +60,17 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> deleteRecord(int id) =>
       (delete(downloadRecords)..where((t) => t.id.equals(id))).go();
+
+  Future<DownloadRecord?> recordById(int id) =>
+      (select(downloadRecords)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<void> saveTranscript(int id, String srt, String? path) =>
+      (update(downloadRecords)..where((t) => t.id.equals(id))).write(
+        DownloadRecordsCompanion(
+          transcriptSrt: Value(srt),
+          transcriptPath: Value(path),
+        ),
+      );
 
   Future<void> deleteFinished() => delete(downloadRecords).go();
 }
