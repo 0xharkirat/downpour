@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'friendly_errors.dart';
 import 'models.dart';
 
@@ -20,13 +22,24 @@ sealed class DownloadEvent {
 }
 
 class ProgressEvent extends DownloadEvent {
-  const ProgressEvent({this.fraction, this.downloadedBytes, this.totalBytes, this.speed, this.etaSeconds});
+  const ProgressEvent({
+    this.fraction,
+    this.downloadedBytes,
+    this.totalBytes,
+    this.speed,
+    this.etaSeconds,
+    this.audioTrack = false,
+  });
 
   final double? fraction;
   final int? downloadedBytes;
   final int? totalBytes;
   final double? speed;
   final int? etaSeconds;
+
+  /// True once the video track finished and the separate audio track is
+  /// downloading (merged-format downloads run in two passes).
+  final bool audioTrack;
 }
 
 class ProcessingEvent extends DownloadEvent {
@@ -68,6 +81,7 @@ class YtDlpService {
   Future<VideoInfo> fetchInfo(String url, {required String binary}) async {
     final result = await Process.run(binary, ['-J', '--no-playlist', '--no-warnings', url]);
     if (result.exitCode != 0) {
+      debugPrint('yt-dlp -J exited ${result.exitCode} for $url\n${(result.stderr as String).trim()}');
       throw YtDlpException(_tail(result.stderr as String));
     }
     final json = jsonDecode(result.stdout as String) as Map<String, dynamic>;
@@ -114,11 +128,25 @@ class YtDlpService {
     String? resolution;
     var sawFullProgress = false;
 
+    var inAudioPass = false;
     process.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
       if (line.startsWith(_progressPrefix)) {
-        final event = _parseProgress(line);
+        var event = _parseProgress(line);
         if (event != null) {
+          // A fraction reset after hitting 100% means the second (audio)
+          // stream of a merged download started.
+          if (sawFullProgress && (event.fraction ?? 1) < 0.5) inAudioPass = true;
           if ((event.fraction ?? 0) >= 0.999) sawFullProgress = true;
+          if (inAudioPass) {
+            event = ProgressEvent(
+              fraction: event.fraction,
+              downloadedBytes: event.downloadedBytes,
+              totalBytes: event.totalBytes,
+              speed: event.speed,
+              etaSeconds: event.etaSeconds,
+              audioTrack: true,
+            );
+          }
           controller.add(event);
         }
       } else if (line.startsWith('DR|')) {
@@ -141,6 +169,9 @@ class YtDlpService {
         // SIGTERM from cancel; the notifier already marked the task canceled.
         controller.add(const FailedEvent('Canceled'));
       } else {
+        // Raw engine output in the debug console for diagnosis; the UI shows
+        // the friendly version.
+        debugPrint('yt-dlp exited $code for $url\n${stderrTail.join('\n')}');
         controller.add(FailedEvent(_tail(stderrTail.join('\n'))));
       }
       await controller.close();

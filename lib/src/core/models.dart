@@ -82,6 +82,7 @@ class DownloadTask {
     this.filePath,
     this.error,
     this.resolution,
+    this.downloadingAudio = false,
   });
 
   final String id;
@@ -107,6 +108,9 @@ class DownloadTask {
   /// What was actually downloaded, e.g. "1080p" or "audio".
   final String? resolution;
 
+  /// True while the separate audio track of a merged download runs.
+  final bool downloadingAudio;
+
   DownloadTask copyWith({
     DownloadStatus? status,
     int? recordId,
@@ -119,6 +123,7 @@ class DownloadTask {
     String? filePath,
     String? error,
     String? resolution,
+    bool? downloadingAudio,
   }) =>
       DownloadTask(
         id: id,
@@ -135,6 +140,7 @@ class DownloadTask {
         filePath: filePath ?? this.filePath,
         error: error ?? this.error,
         resolution: resolution ?? this.resolution,
+        downloadingAudio: downloadingAudio ?? this.downloadingAudio,
       );
 
   String get displayTitle => info?.title ?? url;

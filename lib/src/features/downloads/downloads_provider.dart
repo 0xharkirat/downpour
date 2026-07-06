@@ -70,7 +70,7 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
 
       handle.events.listen((event) {
         switch (event) {
-          case ProgressEvent(:final fraction, :final downloadedBytes, :final totalBytes, :final speed, :final etaSeconds):
+          case ProgressEvent(:final fraction, :final downloadedBytes, :final totalBytes, :final speed, :final etaSeconds, :final audioTrack):
             _update(
               id,
               (t) => t.copyWith(
@@ -80,6 +80,7 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
                 totalBytes: totalBytes,
                 speed: speed,
                 etaSeconds: etaSeconds,
+                downloadingAudio: audioTrack,
               ),
             );
           case ProcessingEvent():

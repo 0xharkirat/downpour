@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter test test/
+      - run: flutter build macos --release
+      - name: Ad-hoc sign and zip
+        run: |
+          codesign --force --deep -s - build/macos/Build/Products/Release/Downpour.app
+          ditto -c -k --keepParent build/macos/Build/Products/Release/Downpour.app Downpour-macos.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Downpour-macos.zip
+          draft: false
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath Downpour-windows-x64.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Downpour-windows-x64.zip
+          draft: false
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - name: Package
+        run: |
+          mkdir -p dist/downpour
+          cp -r build/linux/x64/release/bundle/* dist/downpour/
+          cp assets/icon/icon.png dist/downpour/downpour.png
+          cat > dist/downpour/downpour.desktop << 'EOF'
+          [Desktop Entry]
+          Name=Downpour
+          Comment=Open-source video downloader
+          Exec=downpour
+          Icon=downpour
+          Type=Application
+          Categories=AudioVideo;Network;
+          EOF
+          tar -czf Downpour-linux-x64.tar.gz -C dist downpour
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Downpour-linux-x64.tar.gz
+          draft: false
