@@ -24,7 +24,7 @@ Grab the latest build from [Releases](https://github.com/0xharkirat/downpour/rel
 ### Linux
 
 1. Download `Downpour-linux-x64.tar.gz` and extract it: `tar -xzf Downpour-linux-x64.tar.gz`
-2. Run `./downpour/downpour`.
+2. Run `./downpour/downpour`. Needs GTK 3 and libnotify, present on most desktop distros (Debian/Ubuntu: `sudo apt install libgtk-3-0 libnotify4`).
 
 ## First launch
 
