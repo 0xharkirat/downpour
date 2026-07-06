@@ -1,8 +1,6 @@
-import 'dart:io';
-
-import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:super_drag_and_drop/super_drag_and_drop.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -32,24 +30,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  /// Browsers deliver dragged links as .webloc (macOS) or .url (Windows)
-  /// files; extract the address and fetch its preview.
-  Future<void> _handleDrop(DropDoneDetails details) async {
-    for (final item in details.files) {
-      final path = item.path;
-      String? url;
-      if (path.endsWith('.webloc') || path.endsWith('.url')) {
-        final content = await File(path).readAsString();
-        url = RegExp(r'https?://[^\s<>"]+').firstMatch(content)?.group(0);
-      } else if (RegExp(r'^https?://').hasMatch(path)) {
-        url = path;
+  /// Accepts links dragged from a browser address bar or dropped as text.
+  void _handleDrop(PerformDropEvent event) {
+    for (final item in event.session.items) {
+      final reader = item.dataReader;
+      if (reader == null) continue;
+      if (reader.canProvide(Formats.uri)) {
+        reader.getValue<NamedUri>(Formats.uri, (value) {
+          final url = value?.uri.toString();
+          if (url != null && url.startsWith('http')) _acceptDroppedUrl(url);
+        });
+        return;
       }
-      if (url != null) {
-        _urlController.text = url;
-        _fetch(url);
+      if (reader.canProvide(Formats.plainText)) {
+        reader.getValue<String>(Formats.plainText, (value) {
+          final url = RegExp(r'https?://\S+').firstMatch(value ?? '')?.group(0);
+          if (url != null) _acceptDroppedUrl(url);
+        });
         return;
       }
     }
+  }
+
+  void _acceptDroppedUrl(String url) {
+    if (!mounted) return;
+    _urlController.text = url;
+    _fetch(url);
   }
 
   Future<void> _paste() async {
@@ -96,12 +102,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      child: DropTarget(
-        onDragEntered: (_) => setState(() => _dragging = true),
-        onDragExited: (_) => setState(() => _dragging = false),
-        onDragDone: (details) {
+      child: DropRegion(
+        formats: const [Formats.uri, Formats.plainText],
+        hitTestBehavior: HitTestBehavior.opaque,
+        onDropOver: (event) => event.session.allowedOperations.contains(DropOperation.copy)
+            ? DropOperation.copy
+            : DropOperation.none,
+        onDropEnter: (_) => setState(() => _dragging = true),
+        onDropLeave: (_) => setState(() => _dragging = false),
+        onPerformDrop: (event) async {
           setState(() => _dragging = false);
-          _handleDrop(details);
+          _handleDrop(event);
         },
         child: DecoratedBox(
           decoration: BoxDecoration(
