@@ -95,6 +95,7 @@ class YtDlpService {
     required String directory,
     required String binary,
     String? ffmpegPath,
+    ContainerPreference container = ContainerPreference.mp4,
   }) async {
     final args = [
       '--newline',
@@ -117,7 +118,7 @@ class YtDlpService {
       // qualities; otherwise yt-dlp sees the file and skips the download.
       '-o',
       '$directory${Platform.pathSeparator}%(title)s [${preset.label}].%(ext)s',
-      ...preset.args(ffmpegAvailable: ffmpegPath != null),
+      ...preset.args(ffmpegAvailable: ffmpegPath != null, container: container),
       url,
     ];
 

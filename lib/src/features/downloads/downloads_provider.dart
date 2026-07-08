@@ -65,6 +65,7 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
         directory: directory,
         binary: engine.ytdlpPath,
         ffmpegPath: engine.ffmpegPath,
+        container: ref.read(settingsProvider).container,
       );
       _handles[id] = handle;
 

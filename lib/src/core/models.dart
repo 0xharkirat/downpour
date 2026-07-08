@@ -1,6 +1,20 @@
 /// Core domain models for Downpour.
 library;
 
+/// Output container preference for video downloads.
+enum ContainerPreference {
+  /// H.264+AAC in MP4: plays everywhere, but sites rarely offer it above
+  /// 1080p. Falls back to the best available stream when no MP4 exists.
+  mp4('MP4 (plays everywhere)'),
+
+  /// Whatever the site's best streams are, typically VP9/AV1+Opus in WebM.
+  best('Best quality (WebM/MKV)');
+
+  const ContainerPreference(this.label);
+
+  final String label;
+}
+
 /// Quality presets mapped to yt-dlp format selectors.
 enum QualityPreset {
   best('Best', null),
@@ -16,14 +30,30 @@ enum QualityPreset {
 
   /// yt-dlp arguments for this preset. Without ffmpeg, streams can't be
   /// merged or converted, so selectors degrade to single-file formats.
-  List<String> args({required bool ffmpegAvailable}) {
+  List<String> args({
+    required bool ffmpegAvailable,
+    ContainerPreference container = ContainerPreference.mp4,
+  }) {
     if (this == QualityPreset.audio) {
       return ffmpegAvailable
           ? const ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
           : const ['-f', 'ba[ext=m4a]/ba/b'];
     }
     final h = maxHeight == null ? '' : '[height<=$maxHeight]';
-    return ffmpegAvailable ? ['-f', 'bv*$h+ba/b$h'] : ['-f', 'b$h/b'];
+    if (!ffmpegAvailable) {
+      return container == ContainerPreference.mp4
+          ? ['-f', 'b[ext=mp4]$h/b$h/b']
+          : ['-f', 'b$h/b'];
+    }
+    if (container == ContainerPreference.mp4) {
+      // Prefer H.264+AAC (true MP4); fall back to the site's best streams
+      // in their native container rather than mislabeling them as .mp4.
+      return [
+        '-f',
+        'bv*[vcodec^=avc1]$h+ba[acodec^=mp4a]/b[ext=mp4]$h/bv*$h+ba/b$h',
+      ];
+    }
+    return ['-f', 'bv*$h+ba/b$h'];
   }
 }
 

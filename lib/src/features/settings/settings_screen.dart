@@ -88,6 +88,31 @@ class SettingsScreen extends ConsumerWidget {
                           ],
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      Text('Format', style: _labelStyle(theme)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          for (final container in ContainerPreference.values) ...[
+                            FButton(
+                              variant: settings.container == container
+                                  ? FButtonVariant.primary
+                                  : FButtonVariant.outline,
+                              size: FButtonSizeVariant.sm,
+                              mainAxisSize: MainAxisSize.min,
+                              onPress: () => notifier.setContainer(container),
+                              child: Text(container.label),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'MP4 uses H.264, which most sites only offer up to 1080p. '
+                        'Best quality picks the highest fidelity streams, usually WebM.',
+                        style: theme.typography.body.xs.copyWith(color: theme.colors.mutedForeground),
+                      ),
                     ],
                   ),
                 ),

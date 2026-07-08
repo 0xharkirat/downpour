@@ -19,6 +19,7 @@ class AppSettings {
     this.ytdlpPath,
     this.defaultPreset = QualityPreset.best,
     this.themeMode = ThemeMode.system,
+    this.container = ContainerPreference.mp4,
   });
 
   final String? downloadDir;
@@ -28,18 +29,21 @@ class AppSettings {
   final String? ytdlpPath;
   final QualityPreset defaultPreset;
   final ThemeMode themeMode;
+  final ContainerPreference container;
 
   AppSettings copyWith({
     String? downloadDir,
     String? ytdlpPath,
     QualityPreset? defaultPreset,
     ThemeMode? themeMode,
+    ContainerPreference? container,
   }) =>
       AppSettings(
         downloadDir: downloadDir ?? this.downloadDir,
         ytdlpPath: ytdlpPath ?? this.ytdlpPath,
         defaultPreset: defaultPreset ?? this.defaultPreset,
         themeMode: themeMode ?? this.themeMode,
+        container: container ?? this.container,
       );
 }
 
@@ -48,6 +52,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
   static const _kYtdlpPath = 'ytdlpPath';
   static const _kPreset = 'defaultPreset';
   static const _kThemeMode = 'themeMode';
+  static const _kContainer = 'container';
 
   SharedPreferences get _prefs => ref.read(sharedPreferencesProvider);
 
@@ -59,6 +64,8 @@ class SettingsNotifier extends Notifier<AppSettings> {
       ytdlpPath: prefs.getString(_kYtdlpPath),
       defaultPreset: QualityPreset.values.asNameMap()[prefs.getString(_kPreset)] ?? QualityPreset.best,
       themeMode: ThemeMode.values.asNameMap()[prefs.getString(_kThemeMode)] ?? ThemeMode.system,
+      container: ContainerPreference.values.asNameMap()[prefs.getString(_kContainer)] ??
+          ContainerPreference.mp4,
     );
   }
 
@@ -85,6 +92,11 @@ class SettingsNotifier extends Notifier<AppSettings> {
   Future<void> setDefaultPreset(QualityPreset preset) async {
     state = state.copyWith(defaultPreset: preset);
     await _prefs.setString(_kPreset, preset.name);
+  }
+
+  Future<void> setContainer(ContainerPreference container) async {
+    state = state.copyWith(container: container);
+    await _prefs.setString(_kContainer, container.name);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
