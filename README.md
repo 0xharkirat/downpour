@@ -12,9 +12,14 @@ Grab the latest build from [Releases](https://github.com/0xharkirat/downpour/rel
 
 ### macOS
 
-1. Download `Downpour-macos.zip`, unzip, and drag `Downpour.app` into Applications.
-2. First launch: right-click the app and choose **Open** (the build is not notarized yet, so double-clicking is blocked by Gatekeeper).
-   If macOS still refuses, run: `xattr -dr com.apple.quarantine /Applications/Downpour.app`
+1. Download `Downpour-macos.dmg` and open it.
+2. Drag `Downpour` into the `Applications` folder.
+3. Open Downpour from Applications. macOS will say it cannot verify the app; click **Done** (not "Move to Bin").
+4. Go to **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**.
+5. Confirm **Open Anyway** in the dialog. From then on the app opens normally.
+
+This dance exists because the build is not notarized by Apple yet.
+Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Downpour.app`
 
 ### Windows
 

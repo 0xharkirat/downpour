@@ -18,13 +18,19 @@ jobs:
       - run: flutter pub get
       - run: flutter test test/
       - run: flutter build macos --release
-      - name: Ad-hoc sign and zip
+      - name: Ad-hoc sign and package
         run: |
           codesign --force --deep -s - build/macos/Build/Products/Release/Downpour.app
           ditto -c -k --keepParent build/macos/Build/Products/Release/Downpour.app Downpour-macos.zip
+          mkdir dmgroot
+          cp -R build/macos/Build/Products/Release/Downpour.app dmgroot/
+          ln -s /Applications dmgroot/Applications
+          hdiutil create -volname Downpour -srcfolder dmgroot -ov -format UDZO Downpour-macos.dmg
       - uses: softprops/action-gh-release@v2
         with:
-          files: Downpour-macos.zip
+          files: |
+            Downpour-macos.dmg
+            Downpour-macos.zip
           draft: false
 
   windows:
