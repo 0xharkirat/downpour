@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- One universal macOS DMG (Apple Silicon + Intel) replaces the zip.
+- Homebrew install: `brew install --cask 0xharkirat/tap/downpour`.
+- Format choice: MP4 (plays everywhere, default) or best quality (WebM/MKV).
+- Links dragged from the browser address bar now work.
+- Merged downloads label their second pass as the audio track.
+
 ## 0.1.0
 
 First public release.

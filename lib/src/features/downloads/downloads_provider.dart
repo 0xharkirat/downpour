@@ -8,6 +8,7 @@ import 'package:local_notifier/local_notifier.dart';
 import '../../core/database.dart';
 import '../../core/engine_provider.dart';
 import '../../core/models.dart';
+import '../../core/open_in_os.dart';
 import '../../core/settings.dart';
 import '../../core/ytdlp_service.dart';
 
@@ -178,27 +179,11 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
   }
 
   Future<void> revealInFolder(DownloadTask task) async {
-    final path = task.filePath;
-    if (path == null) return;
-    if (Platform.isMacOS) {
-      await Process.run('open', ['-R', path]);
-    } else if (Platform.isWindows) {
-      await Process.run('explorer', ['/select,', path]);
-    } else if (Platform.isLinux) {
-      await Process.run('xdg-open', [File(path).parent.path]);
-    }
+    if (task.filePath != null) await revealPath(task.filePath!);
   }
 
   Future<void> openFile(DownloadTask task) async {
-    final path = task.filePath;
-    if (path == null) return;
-    if (Platform.isMacOS) {
-      await Process.run('open', [path]);
-    } else if (Platform.isWindows) {
-      await Process.run('cmd', ['/c', 'start', '', path]);
-    } else if (Platform.isLinux) {
-      await Process.run('xdg-open', [path]);
-    }
+    if (task.filePath != null) await openPath(task.filePath!);
   }
 
   void _update(String id, DownloadTask Function(DownloadTask) transform) {
@@ -211,7 +196,3 @@ class DownloadsNotifier extends Notifier<List<DownloadTask>> {
 
 final downloadsProvider =
     NotifierProvider<DownloadsNotifier, List<DownloadTask>>(DownloadsNotifier.new);
-
-final hasActiveDownloadsProvider = Provider<bool>(
-  (ref) => ref.watch(downloadsProvider).any((t) => t.status.isActive),
-);

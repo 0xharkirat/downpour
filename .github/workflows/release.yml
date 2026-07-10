@@ -18,19 +18,18 @@ jobs:
       - run: flutter pub get
       - run: flutter test test/
       - run: flutter build macos --release
-      - name: Ad-hoc sign and package
+      - name: Package universal DMG
         run: |
+          pip3 install --break-system-packages dmgbuild
           codesign --force --deep -s - build/macos/Build/Products/Release/Downpour.app
-          ditto -c -k --keepParent build/macos/Build/Products/Release/Downpour.app Downpour-macos.zip
-          mkdir dmgroot
-          cp -R build/macos/Build/Products/Release/Downpour.app dmgroot/
-          ln -s /Applications dmgroot/Applications
-          hdiutil create -volname Downpour -srcfolder dmgroot -ov -format UDZO Downpour-macos.dmg
+          APP=build/macos/Build/Products/Release/Downpour.app
+          dmgbuild -s tool/dmg_settings.py \
+            -D app="$APP" -D icon="$APP/Contents/Resources/AppIcon.icns" \
+            "Downpour" Downpour.dmg
+          shasum -a 256 Downpour.dmg
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            Downpour-macos.dmg
-            Downpour-macos.zip
+          files: Downpour.dmg
           draft: false
 
   windows:

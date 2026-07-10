@@ -33,8 +33,6 @@ class DownloadRecords extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_open());
 
-  AppDatabase.forTesting(super.executor);
-
   @override
   int get schemaVersion => 3;
 

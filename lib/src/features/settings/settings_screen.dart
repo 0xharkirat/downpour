@@ -227,7 +227,7 @@ class SettingsScreen extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text('0.1.0', style: theme.typography.body.xs.copyWith(color: theme.colors.mutedForeground)),
+                          Text('0.1.1', style: theme.typography.body.xs.copyWith(color: theme.colors.mutedForeground)),
                         ],
                       ),
                       const SizedBox(height: 8),

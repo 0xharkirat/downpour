@@ -10,16 +10,40 @@ No terminal, no Python, no manual installs: Downpour provisions its own download
 
 Grab the latest build from [Releases](https://github.com/0xharkirat/downpour/releases).
 
-### macOS
+### macOS (Homebrew)
 
-1. Download `Downpour-macos.dmg` and open it.
-2. Drag `Downpour` into the `Applications` folder.
+```bash
+brew install --cask 0xharkirat/tap/downpour
+```
+
+This taps `0xharkirat/homebrew-tap` and installs `Downpour.app`.
+Update later with `brew upgrade --cask downpour`.
+
+Homebrew 6 and newer refuse to load casks from an untrusted third-party tap.
+If you see "Refusing to load cask ... from untrusted tap", trust it once:
+
+```bash
+brew trust 0xharkirat/tap
+```
+
+The cask clears the download quarantine as it installs, so Gatekeeper should not block the first launch.
+
+### macOS (manual DMG)
+
+The DMG is universal: one download for Apple Silicon and Intel.
+
+1. Download `Downpour.dmg` and open it.
+2. Drag `Downpour` onto the `Applications` shortcut.
 3. Open Downpour from Applications. macOS will say it cannot verify the app; click **Done** (not "Move to Bin").
-4. Go to **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**.
-5. Confirm **Open Anyway** in the dialog. From then on the app opens normally.
+4. Go to **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**, then confirm. You only do this once.
 
-This dance exists because the build is not notarized by Apple yet.
-Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Downpour.app`
+Terminal alternative to steps 3-4:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Downpour.app
+```
+
+This dance exists because the build is ad-hoc signed rather than notarized by Apple.
 
 ### Windows
 

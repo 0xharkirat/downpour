@@ -132,22 +132,12 @@ class YtDlpService {
     var inAudioPass = false;
     process.stdout.transform(utf8.decoder).transform(const LineSplitter()).listen((line) {
       if (line.startsWith(_progressPrefix)) {
-        var event = _parseProgress(line);
+        // A fraction reset after hitting 100% means the second (audio)
+        // stream of a merged download started.
+        final event = _parseProgress(line, audioTrack: inAudioPass);
         if (event != null) {
-          // A fraction reset after hitting 100% means the second (audio)
-          // stream of a merged download started.
           if (sawFullProgress && (event.fraction ?? 1) < 0.5) inAudioPass = true;
           if ((event.fraction ?? 0) >= 0.999) sawFullProgress = true;
-          if (inAudioPass) {
-            event = ProgressEvent(
-              fraction: event.fraction,
-              downloadedBytes: event.downloadedBytes,
-              totalBytes: event.totalBytes,
-              speed: event.speed,
-              etaSeconds: event.etaSeconds,
-              audioTrack: true,
-            );
-          }
           controller.add(event);
         }
       } else if (line.startsWith('DR|')) {
@@ -190,14 +180,12 @@ class YtDlpService {
     return raw;
   }
 
-  ProgressEvent? _parseProgress(String line) {
+  ProgressEvent? _parseProgress(String line, {bool audioTrack = false}) {
     final parts = line.substring(_progressPrefix.length).split('|');
     if (parts.length < 5) return null;
     int? asInt(String s) => double.tryParse(s)?.round();
     final downloaded = asInt(parts[0]);
     final total = asInt(parts[1]) ?? asInt(parts[2]);
-    final speed = double.tryParse(parts[3]);
-    final eta = asInt(parts[4]);
     final fraction = (downloaded != null && total != null && total > 0)
         ? (downloaded / total).clamp(0.0, 1.0)
         : null;
@@ -205,8 +193,9 @@ class YtDlpService {
       fraction: fraction,
       downloadedBytes: downloaded,
       totalBytes: total,
-      speed: speed,
-      etaSeconds: eta,
+      speed: double.tryParse(parts[3]),
+      etaSeconds: asInt(parts[4]),
+      audioTrack: audioTrack,
     );
   }
 

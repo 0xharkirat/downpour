@@ -45,3 +45,4 @@ app.*.map.json
 /android/app/release
 
 integration_test/test_bundle.dart
+dist/

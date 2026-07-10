@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
@@ -8,6 +7,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/open_in_os.dart';
 import 'transcript_provider.dart';
 
 class TranscriptScreen extends ConsumerWidget {
@@ -135,7 +135,7 @@ class _Body extends ConsumerWidget {
                 size: FButtonSizeVariant.sm,
                 mainAxisSize: MainAxisSize.min,
                 prefix: const Icon(FLucideIcons.folderOpen),
-                onPress: () => _reveal(record.filePath!),
+                onPress: () => revealPath(record.filePath!),
                 child: const Text('Video file'),
               ),
             if (result.sidecarPath != null) ...[
@@ -145,7 +145,7 @@ class _Body extends ConsumerWidget {
                 size: FButtonSizeVariant.sm,
                 mainAxisSize: MainAxisSize.min,
                 prefix: const Icon(FLucideIcons.fileText),
-                onPress: () => _reveal(result.sidecarPath!),
+                onPress: () => revealPath(result.sidecarPath!),
                 child: const Text('Transcript file'),
               ),
             ],
@@ -211,13 +211,4 @@ class _Body extends ConsumerWidget {
     );
   }
 
-  void _reveal(String path) {
-    if (Platform.isMacOS) {
-      Process.run('open', ['-R', path]);
-    } else if (Platform.isWindows) {
-      Process.run('explorer', ['/select,', path]);
-    } else if (Platform.isLinux) {
-      Process.run('xdg-open', [File(path).parent.path]);
-    }
-  }
 }
